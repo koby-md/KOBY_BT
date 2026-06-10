@@ -16,6 +16,7 @@ export async function before(m, { conn }) {
 
   try {
     await m.react('⏳')
+    await m.reply (wait)
 
     const res = await fbdown(match[0])
 
