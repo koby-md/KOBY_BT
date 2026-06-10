@@ -18,11 +18,12 @@ function formatViews(views) {
 }
 
 let handler = async (m, { conn, text }) => {
-  if (!text) throw '⚠️ اكتب اسم الفيديو أو الأغنية'
+  if (!text) throw '🛡 اكتب اسم الفيديو أو الأغنية'
 
   try {
     const search = await yts(text)
-
+    await m.react('⏳')
+    await m.reply (wait)
     if (!search.videos.length) {
       return m.reply('❌ لم يتم العثور على نتائج')
     }
@@ -100,7 +101,7 @@ let handler = async (m, { conn, text }) => {
         quoted: m
       }
     )
-
+    await m.react('💡')
     await conn.relayMessage(
       m.chat,
       msg.message,
