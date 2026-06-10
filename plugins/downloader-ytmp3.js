@@ -79,6 +79,7 @@ let handler = async (m, { conn, text }) => {
 
   try {
     await m.react('⏳')
+    await m.reply (wait)
 
     const st = new SaveTube()
     const res = await st.download(text)
