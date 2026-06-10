@@ -20,6 +20,7 @@ export async function before(m, { conn }) {
 
   try {
     await m.react('⏳')
+    await m.reply (wait)
 
     const response = await fetch(
       `https://koby-api.vercel.app/?url=${encodeURIComponent(url)}`
