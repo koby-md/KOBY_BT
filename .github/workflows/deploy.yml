@@ -1,4 +1,4 @@
-name: Deploy
+Name: Deploy
 
 on:
   push:
@@ -7,6 +7,11 @@ on:
     branches: [main]
   schedule:
     - cron: "0 */6 * * *"  # كيعاود يخدم كل 6 سوايع
+
+# هادي هي الساروت: كتخلي غير Run واحد لي خدام فالمجموع كامل
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -20,16 +25,22 @@ jobs:
       actions: write
 
     steps:
+      # خطوة احتياطية: يلا كان شي Run قديم وحل، هادي كيطفيه هو الأول قبل ما يبدا الجديد
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.12.1 # تحديث للنسخة أحدث
+        with:
+          access_token: ${{ github.token }}
+
       - name: Clone repository
         uses: actions/checkout@v4
 
       - name: Install Node.js 20
-        uses: actions/setup-node@v3 
+        uses: actions/setup-node@v4 # تحديث لـ v4 باش توافق مع Node 20 بشكل أفضل
         with:
           node-version: 20
 
       - name: Cache node_modules
-        uses: actions/cache@v3
+        uses: actions/cache@v4 # تحديث لـ v4
         with:
           path: node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
@@ -43,11 +54,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg imagemagick libwebp-dev
-
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.11.0
-        with:
-          access_token: ${{ github.token }} 
 
       - name: Start Project
         timeout-minutes: 345 
