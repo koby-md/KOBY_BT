@@ -13,7 +13,7 @@ export async function before(m, { conn }) {
 
   try {
     await m.react('⏳️');
-
+    await m.reply (wait);
     const encodedParams = new URLSearchParams()
     encodedParams.set('url', text)
     encodedParams.set('hd', '2')
