@@ -1,93 +1,120 @@
-import { prepareWAMessageMedia, generateWAMessageFromContent, getDevice } from "@whiskeysockets/baileys"
-import yts from 'yt-search';
-import fs from 'fs';
+import {
+  prepareWAMessageMedia,
+  generateWAMessageFromContent
+} from '@whiskeysockets/baileys'
 
-const handler = async (m, { conn, text, usedPrefix: prefijo }) => {
-    const datas = global;
-    const idioma = datas.db.data.users[m.sender].language || global.defaultLenguaje;
-    const _translate = JSON.parse(fs.readFileSync(`./src/languages/${idioma}.json`));
-    const traductor = _translate.plugins.buscador_yts;
-    const device = await getDevice(m.key.id);
+import yts from 'yt-search'
 
-  if (!text) throw `⚠️ *${traductor.texto1}*`;
+function formatViews(views) {
+  if (views >= 1000000) {
+    return (views / 1000000).toFixed(1).replace('.0', '') + 'M'
+  }
 
-  if (device !== 'desktop' || device !== 'web') {      
+  if (views >= 1000) {
+    return (views / 1000).toFixed(1).replace('.0', '') + 'K'
+  }
 
-  const results = await yts(text);
-  if (!results || !results?.videos) return m.reply('> *[❗] Error: Videos not founds.*')    
-  const videos = results.videos.slice(0, 20);
-  const randomIndex = Math.floor(Math.random() * videos.length);
-  const randomVideo = videos[randomIndex];
+  return views.toString()
+}
 
-  var messa = await prepareWAMessageMedia({ image: {url: randomVideo.thumbnail}}, { upload: conn.waUploadToServer })
-  const interactiveMessage = {
-    body: { text: `*—◉ Resultados obtenidos:* ${results.videos.length}\n*—◉ Video aleatorio:*\n*-› Title:* ${randomVideo.title}\n*-› Author:* ${randomVideo.author.name}\n*-› Views:* ${randomVideo.views}\n*-› ${traductor.texto2[0]}:* ${randomVideo.url}\n*-› Imagen:* ${randomVideo.thumbnail}`.trim() },
-    footer: { text: `${global.wm}`.trim() },  
-      header: {
-          title: `*< YouTube Search />*\n`,
-          hasMediaAttachment: true,
-          imageMessage: messa.imageMessage,
+let handler = async (m, { conn, text }) => {
+  if (!text) throw '⚠️ اكتب اسم الفيديو أو الأغنية'
+
+  try {
+    const search = await yts(text)
+
+    if (!search.videos.length) {
+      return m.reply('❌ لم يتم العثور على نتائج')
+    }
+
+    const v = search.videos[0]
+
+    const media = await prepareWAMessageMedia(
+      {
+        image: { url: v.thumbnail }
       },
-    nativeFlowMessage: {
-      buttons: [
-        {
-          name: 'single_select',
-          buttonParamsJson: JSON.stringify({
-            title: 'OPCIONES DISPONIBLES',
-            sections: videos.map((video) => ({
-              title: video.title,
-              rows: [
-                {
-                  header: video.title,
-                  title: video.author.name,
-                  description: 'Descargar MP3',
-                  id: `${prefijo}ytmp3 ${video.url}`
-                },
-                {
-                  header: video.title,
-                  title: video.author.name,
-                  description: 'Descargar MP4',
-                  id: `${prefijo}ytmp4 ${video.url}`
-                }
-              ]
-            }))
-          })
+      {
+        upload: conn.waUploadToServer
+      }
+    )
+
+    const msg = generateWAMessageFromContent(
+      m.chat,
+      {
+        viewOnceMessage: {
+          message: {
+            interactiveMessage: {
+              header: {
+                hasMediaAttachment: true,
+                imageMessage: media.imageMessage,
+                title: '🎬 YouTube KOBY 🧬'
+              },
+
+              body: {
+                text:
+`🎵 *${v.title}*
+
+👤 Author: ${v.author.name}
+⏱️ Duration: ${v.timestamp}
+👁️ Views: ${formatViews(v.views)}
+
+🔗 ${v.url}`
+              },
+
+              footer: {
+                text: 'اختر أحد الخيارات'
+              },
+
+              nativeFlowMessage: {
+                buttons: [
+                  {
+                    name: 'cta_copy',
+                    buttonParamsJson: JSON.stringify({
+                      display_text: '📋 Copy URL',
+                      copy_code: v.url
+                    })
+                  },
+                  {
+                    name: 'cta_url',
+                    buttonParamsJson: JSON.stringify({
+                      display_text: '🌐 Open URL',
+                      url: v.url,
+                      merchant_url: v.url
+                    })
+                  },
+                  {
+                    name: 'quick_reply',
+                    buttonParamsJson: JSON.stringify({
+                      display_text: '📥 Download',
+                      id: `.play ${v.url}`
+                    })
+                  }
+                ]
+              }
+            }
+          }
         }
-      ],
-      messageParamsJson: ''
-    }
-  };        
+      },
+      {
+        userJid: conn.user.jid,
+        quoted: m
+      }
+    )
 
-        let msg = generateWAMessageFromContent(m.chat, {
-            viewOnceMessage: {
-                message: {
-                    interactiveMessage,
-                },
-            },
-        }, { userJid: conn.user.jid, quoted: m })
-      conn.relayMessage(m.chat, msg.message, { messageId: msg.key.id});
+    await conn.relayMessage(
+      m.chat,
+      msg.message,
+      { messageId: msg.key.id }
+    )
 
-  } else {
-  const datas = global;
-  const idioma = datas.db.data.users[m.sender].language || global.defaultLenguaje;
-  const _translate = JSON.parse(fs.readFileSync(`./src/languages/${idioma}.json`));
-  const traductor = _translate.plugins.buscador_yts;      
-  const results = await yts(text);
-  const tes = results.all;
-  const teks = results.all.map((v) => {
-    switch (v.type) {
-      case 'video': return `
-° *_${v.title}_*
-↳ 🫐 *_${traductor.texto2[0]}_* ${v.url}
-↳ 🕒 *_${traductor.texto2[1]}_* ${v.timestamp}
-↳ 📥 *_${traductor.texto2[2]}_* ${v.ago}
-↳ 👁 *_${traductor.texto2[3]}_* ${v.views}`;
-    }
-  }).filter((v) => v).join('\n\n◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦◦\n\n');
-  conn.sendFile(m.chat, tes[0].thumbnail, 'error.jpg', teks.trim(), m);      
-  }    
-};
-handler.help = ['ytsearch <texto>'];
-handler.tags = ['search'];
-handler.command = /^(yts)$/i;
-export default handler;
+  } catch (e) {
+    console.error(e)
+    m.reply('❌ حدث خطأ أثناء البحث')
+  }
+}
+
+handler.help = ['yts <query>']
+handler.tags = ['search']
+handler.command = /^yts$/i
+
+export default handler
