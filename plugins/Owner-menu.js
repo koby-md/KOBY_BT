@@ -11,7 +11,8 @@ let handler = async (m, { conn }) => {
     if (!match) throw 'Image not found'
 
     const imageUrl = match[1]
-
+    await m.react('⏳')
+    await m.reply (wait)
     await conn.sendMessage(
       m.chat,
       {
@@ -29,7 +30,7 @@ let handler = async (m, { conn }) => {
       },
       { quoted: m }
     )
-
+    await m.react('📜')
   } catch (e) {
     console.error(e)
     m.reply('❌ فشل إرسال الصورة')
