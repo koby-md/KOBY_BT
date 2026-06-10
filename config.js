@@ -25,7 +25,7 @@ global.APIKeys = { // APIKey Here
 // Sticker WM
 global.packname = 'Senna┃ᴮᴼᵀ' 
 global.author = '@fg.error' 
-
+global.wait = '> *_جاري التحميل●●●○○ 🖤 WAIT🩶_*'
 //--info FG
 global.botName = 'Senna'
 global.fg_ig = 'https://instagram.com/fg.error' 
