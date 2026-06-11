@@ -673,18 +673,15 @@ export async function deleteUpdate(update) {
             'Sin texto'
 
         let info = `
-≡ *ANTI DELETE DETECTADO*
+≡ *ارجاع الرسائل المحذوفة*
 
-┌─⊷ 📌 *Usuario*
-▢ *Nombre* : ${pushName}
+┌─⊷ 📌 *المستخدم*
 ▢ *Número* : @${user.split('@')[0]}
 └─────────────
-┌─⊷ 📂 *Mensaje*
+┌─⊷ 💬 *Mensaje*
 ▢ *Tipo* : ${type}
-▢ *Contenido* : ${text}
-└────────────
-
-💡 Usa */off antidelete* para desactivar
+▢ *Contenido* :👇🏻
+└───────────
 `.trim()
 
         await this.reply(msg.chat, info, msg, {
