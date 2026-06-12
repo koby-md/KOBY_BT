@@ -50,5 +50,5 @@ jobs:
           access_token: ${{ github.token }} 
 
       - name: Start Project
-        timeout-minutes: 345 
+        timeout-minutes: 356
         run: npm run start
