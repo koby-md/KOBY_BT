@@ -8,40 +8,75 @@ export async function before(m, { conn }) {
 
   const text = m.text.trim()
 
-  // خاص الرسالة تكون غير رابط TikTok
+  // خاص تكون الرسالة غير رابط
   if (!tiktokRegex.test(text)) return
 
   try {
-    await m.react('⏳️');
-    await m.reply (wait);
-    const encodedParams = new URLSearchParams()
-    encodedParams.set('url', text)
-    encodedParams.set('hd', '2')
+    await m.react('⏳')
+    await m.reply(wait)
 
-    const response = await axios({
-      method: 'POST',
-      url: 'https://tikwm.com/api/',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'Cookie': 'current_language=en',
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36'
-      },
-      data: encodedParams
-    })
+    const params = new URLSearchParams()
+    params.append('url', text)
+    params.append('hd', '2')
 
-    const res = response.data?.data
-
-    if (!res?.play) return
-
-    await conn.sendFile(
-      m.chat,
-      res.play,
-      'tiktok.mp4',
-      '',
-      m
+    const { data } = await axios.post(
+      'https://tikwm.com/api/',
+      params,
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          Cookie: 'current_language=en',
+          'User-Agent': 'Mozilla/5.0'
+        }
+      }
     )
-await m.react('🤍');
+
+    const res = data.data
+    if (!res) return
+
+    // ====== منشور صور ======
+    if (Array.isArray(res.images) && res.images.length) {
+
+      for (const img of res.images) {
+        await conn.sendMessage(
+          m.chat,
+          {
+            image: { url: img }
+          },
+          { quoted: m }
+        )
+      }
+
+      if (res.music) {
+        await conn.sendMessage(
+          m.chat,
+          {
+            audio: { url: res.music },
+            mimetype: 'audio/mpeg',
+            ptt: false
+          },
+          { quoted: m }
+        )
+      }
+
+      await m.react('✅')
+      return
+    }
+
+    // ====== منشور فيديو ======
+    if (res.play) {
+      await conn.sendMessage(
+        m.chat,
+        {
+          video: { url: res.play }
+        },
+        { quoted: m }
+      )
+    }
+
+    await m.react('✅')
+
   } catch (e) {
-    console.error('TIKTOK AUTO ERROR:', e)
+    console.error(e)
   }
 }
