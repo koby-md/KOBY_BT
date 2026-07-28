@@ -1,5 +1,3 @@
-
-//-- process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 import './config.js'; 
 import { createRequire } from "module"; // Bring in the ability to create the 'require' method
 import path, { join } from 'path'
@@ -24,9 +22,6 @@ import pino from 'pino';
 import { mongoDB, mongoDBV2 } from './lib/mongoDB.js';
 import store from './lib/store.js'
 import readline from 'readline'
-
-
-
 
 const {
     useMultiFileAuthState,
@@ -64,7 +59,6 @@ global.db = new Low(
       (opts['mongodbv2'] ? new mongoDBV2(opts['db']) : new mongoDB(opts['db'])) :
       new JSONFile(`${opts._[0] ? opts._[0] + '_' : ''}database.json`)
 )
-
 
 global.DATABASE = global.db 
 global.loadDatabase = async function loadDatabase() {
@@ -128,30 +122,12 @@ conn.store = store
 
 conn.ev.on('creds.update', saveCreds)
 
-//--  
-let phoneNumber = global.botNumber[0]
+//--  تعديل كود الربط التلقائي
+let phoneNumber = '212637904038'; // تم وضع الرقم هنا مباشرة
 
 if (!fs.existsSync(`./${authFile}/creds.json`)) {
 
-  const askNumber = () => {
-    return new Promise((resolve) => {
-      const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout
-      })
-
-      rl.question('📲 Ingresa tu número con código país (ej: 549xxxxx): ', (num) => {
-        rl.close()
-        resolve(num.trim())
-      })
-    })
-  }
-
   setTimeout(async () => {
-
-    if (!phoneNumber) {
-      phoneNumber = await askNumber()
-    }
 
     // Validación simple
     if (!/^\d+$/.test(phoneNumber)) {
@@ -159,39 +135,40 @@ if (!fs.existsSync(`./${authFile}/creds.json`)) {
       process.exit(1)
     }
 
-    let code = await conn.requestPairingCode(phoneNumber)
+    try {
+      let code = await conn.requestPairingCode(phoneNumber)
+      code = code?.match(/.{1,4}/g)?.join('-') || code
 
-    code = code?.match(/.{1,4}/g)?.join('-') || code
+      console.log('\n')
+      console.log(chalk.bold.cyan('╔══════════════════════════════════════╗'))
+      console.log(chalk.bold.cyan('║        📲 CÓDIGO DE VINCULACIÓN      ║'))
+      console.log(chalk.bold.cyan('╚══════════════════════════════════════╝'))
 
-console.log('\n')
- console.log(chalk.bold.cyan('╔══════════════════════════════════════╗'))
- console.log(chalk.bold.cyan('║        📲 CÓDIGO DE VINCULACIÓN      ║'))
- console.log(chalk.bold.cyan('╚══════════════════════════════════════╝'))
- 
- console.log('\n')
- 
- // Marco del código
- console.log(chalk.bold.red('        ╔════════════════════╗'))
- console.log(chalk.bold.red('        ║') + chalk.bold.yellow(`     ${code}      `) + chalk.bold.red('║'))
- console.log(chalk.bold.red('        ╚════════════════════╝'))
- 
- console.log('\n')
- 
- console.log(chalk.bold.hex('#FFD700')('📱 PASOS PARA VINCULAR:\n'))
- 
- console.log(chalk.hex('#00BFFF')('   1) ') + chalk.bold.green('Abre WhatsApp'))
- console.log(chalk.hex('#00BFFF')('   2) ') + chalk.bold.cyan('Ve a Dispositivos vinculados'))
- console.log(chalk.hex('#00BFFF')('   3) ') + chalk.bold.magenta('Toca "Vincular con número"'))
- 
- console.log('\n')
-    
+      console.log('\n')
+
+      // Marco del código
+      console.log(chalk.bold.red('        ╔════════════════════╗'))
+      console.log(chalk.bold.red('        ║') + chalk.bold.yellow(`     ${code}      `) + chalk.bold.red('║'))
+      console.log(chalk.bold.red('        ╚════════════════════╝'))
+
+      console.log('\n')
+
+      console.log(chalk.bold.hex('#FFD700')('📱 PASOS PARA VINCULAR:\n'))
+
+      console.log(chalk.hex('#00BFFF')('   1) ') + chalk.bold.green('Abre WhatsApp'))
+      console.log(chalk.hex('#00BFFF')('   2) ') + chalk.bold.cyan('Ve a Dispositivos vinculados'))
+      console.log(chalk.hex('#00BFFF')('   3) ') + chalk.bold.magenta('Toca "Vincular con número"'))
+
+      console.log('\n')
+    } catch (error) {
+      console.error('❌ Error al solicitar el código de vinculación:', error)
+    }
+
   }, 3000)
 }
-//--
+//-- نهاية التعديل
 
 conn.isInit = false
-
-
 
 if (!opts['test']) {
   setInterval(async () => {
@@ -219,8 +196,8 @@ async function clearTmp() {
 }
 
 setInterval(async () => {
-	await clearTmp()
-	//console.log(chalk.cyan(`✅  Auto clear  | Se limpio la carpeta tmp`))
+        await clearTmp()
+        //console.log(chalk.cyan(`✅  Auto clear  | Se limpio la carpeta tmp`))
 }, 60000) //1 munto
 
 async function connectionUpdate(update) {
@@ -318,7 +295,7 @@ global.reloadHandler = async function (restatConn) {
   conn.ev.on('groups.update', conn.groupsUpdate)
   conn.ev.on('connection.update', conn.connectionUpdate)
   conn.ev.on('creds.update', conn.credsUpdate)
-    
+
   conn.ev.on('messages.update', async (updates) => {
     for (const update of updates) {
         try {
