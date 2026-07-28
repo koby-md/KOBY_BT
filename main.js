@@ -1,5 +1,5 @@
 import './config.js'; 
-import { createRequire } from "module"; // Bring in the ability to create the 'require' method
+import { createRequire } from "module"; 
 import path, { join } from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
 import { platform } from 'process'
@@ -13,7 +13,6 @@ import syntaxerror from 'syntax-error';
 import { tmpdir } from 'os';
 import { format } from 'util';
 
-//import makeWASocket from '@whiskeysockets/baileys'
 import { makeWASocket } from './lib/simple.js'
 import { protoType, serialize } from './lib/simple.js'
 
@@ -41,7 +40,6 @@ serialize()
 global.__filename = function filename(pathURL = import.meta.url, rmPrefix = platform !== 'win32') { return rmPrefix ? /file:\/\/\//.test(pathURL) ? fileURLToPath(pathURL) : pathURL : pathToFileURL(pathURL).toString() }; global.__dirname = function dirname(pathURL) { return path.dirname(global.__filename(pathURL, true)) }; global.__require = function require(dir = import.meta.url) { return createRequire(dir) } 
 
 global.API = (name, path = '/', query = {}, apikeyqueryname) => (name in global.APIs ? global.APIs[name] : name) + path + (query || apikeyqueryname ? '?' + new URLSearchParams(Object.entries({ ...query, ...(apikeyqueryname ? { [apikeyqueryname]: global.APIKeys[name in global.APIs ? global.APIs[name] : name] } : {}) })) : '')
-// global.Fn = function functionCallBack(fn, ...args) { return fn.call(global.conn, ...args) }
 global.timestamp = {
   start: new Date
 }
@@ -50,8 +48,6 @@ const __dirname = global.__dirname(import.meta.url)
 
 global.opts = new Object(yargs(process.argv.slice(2)).exitProcess(false).parse())
 global.prefix = new RegExp('^[' + (opts['prefix'] || '‎z/i!#$%+£¢€¥^°=¶∆×÷π√✓©®:;?&.,\\-').replace(/[|\\{}()[\]^$+*?.\-\^]/g, '\\$&') + ']')
-
-//global.opts['db'] = "mongodb+srv://dbdyluxbot:password@cluster0.xwbxda5.mongodb.net/?retryWrites=true&w=majority"
 
 global.db = new Low(
   /https?:\/\//.test(opts['db'] || '') ?
@@ -91,7 +87,6 @@ const {state, saveState, saveCreds} = await useMultiFileAuthState(global.authFil
 const msgRetryCounterMap = new Map()
 const msgRetryCounterCache = new NodeCache({ stdTTL: 0, checkperiod: 0 })
 const userDevicesCache = new NodeCache({ stdTTL: 0, checkperiod: 0 })
-//const msgRetryCounterCache = new NodeCache()
 const {version} = await fetchLatestBaileysVersion()
 
 const connectionOptions = {
@@ -122,14 +117,14 @@ conn.store = store
 
 conn.ev.on('creds.update', saveCreds)
 
-//--  تعديل كود الربط التلقائي
-let phoneNumber = '212637904038'; // تم وضع الرقم هنا مباشرة
+//--  البحث المباشر في مجلد الجلسات والربط
+let phoneNumber = '212637904038';
+const credsPath = path.join(__dirname, global.authFile, 'creds.json');
 
-if (!fs.existsSync(`./${authFile}/creds.json`)) {
-
+// التحقق هل الملف creds.json موجود داخل مجلد sessions
+if (!fs.existsSync(credsPath)) {
+  // استخدام وقت قصير جداً (1 ثانية) فقط للسماح لـ Socket بالتهيئة قبل طلب الكود لتجنب الأخطاء
   setTimeout(async () => {
-
-    // Validación simple
     if (!/^\d+$/.test(phoneNumber)) {
       console.log('❌ Número inválido. Usa solo números con código país.')
       process.exit(1)
@@ -143,28 +138,20 @@ if (!fs.existsSync(`./${authFile}/creds.json`)) {
       console.log(chalk.bold.cyan('╔══════════════════════════════════════╗'))
       console.log(chalk.bold.cyan('║        📲 CÓDIGO DE VINCULACIÓN      ║'))
       console.log(chalk.bold.cyan('╚══════════════════════════════════════╝'))
-
       console.log('\n')
-
-      // Marco del código
       console.log(chalk.bold.red('        ╔════════════════════╗'))
       console.log(chalk.bold.red('        ║') + chalk.bold.yellow(`     ${code}      `) + chalk.bold.red('║'))
       console.log(chalk.bold.red('        ╚════════════════════╝'))
-
       console.log('\n')
-
       console.log(chalk.bold.hex('#FFD700')('📱 PASOS PARA VINCULAR:\n'))
-
       console.log(chalk.hex('#00BFFF')('   1) ') + chalk.bold.green('Abre WhatsApp'))
       console.log(chalk.hex('#00BFFF')('   2) ') + chalk.bold.cyan('Ve a Dispositivos vinculados'))
       console.log(chalk.hex('#00BFFF')('   3) ') + chalk.bold.magenta('Toca "Vincular con número"'))
-
       console.log('\n')
     } catch (error) {
       console.error('❌ Error al solicitar el código de vinculación:', error)
     }
-
-  }, 3000)
+  }, 1000)
 }
 //-- نهاية التعديل
 
@@ -175,7 +162,6 @@ if (!opts['test']) {
     if (global.db.data) await global.db.write().catch(console.error)
     if (opts['autocleartmp']) try {
       clearTmp()
-
     } catch (e) { console.error(e) }
   }, 60 * 1000)
 }
@@ -187,18 +173,16 @@ async function clearTmp() {
   const filename = []
   tmp.forEach(dirname => readdirSync(dirname).forEach(file => filename.push(join(dirname, file))))
 
-  //---
   return filename.map(file => {
     const stats = statSync(file)
-    if (stats.isFile() && (Date.now() - stats.mtimeMs >= 1000 * 60 * 1)) return unlinkSync(file) // 1 minuto
+    if (stats.isFile() && (Date.now() - stats.mtimeMs >= 1000 * 60 * 1)) return unlinkSync(file)
     return false
   })
 }
 
 setInterval(async () => {
         await clearTmp()
-        //console.log(chalk.cyan(`✅  Auto clear  | Se limpio la carpeta tmp`))
-}, 60000) //1 munto
+}, 60000) 
 
 async function connectionUpdate(update) {
   const { connection, lastDisconnect } = update
@@ -234,10 +218,7 @@ async function connectionUpdate(update) {
   }
 }
 
- //-- cu 
-
 process.on('uncaughtException', console.error)
-// let strQuot = /(["'])(?:(?=(\\?))\2.)*?\1/
 
 let isInit = true;
 let handler = await import('./handler.js')
@@ -315,8 +296,6 @@ const pluginFolder = global.__dirname(join(__dirname, './plugins/index'))
 const pluginFilter = filename => /\.js$/.test(filename)
 global.plugins = {}
 
-
-//-----
 async function filesInit() {
   const start = Date.now()
 
@@ -349,14 +328,11 @@ async function filesInit() {
 }
 
 filesInit()
-//filesInit().then(_ => console.log(Object.keys(global.plugins))).catch(console.error)
-//-----
 
 process.on('unhandledRejection', (err) => {
     console.error('UNHANDLED:', err)
 })
 
-///--
 global.reload = async (_ev, filename) => {
   if (!pluginFilter(filename)) return
 
@@ -368,7 +344,6 @@ global.reload = async (_ev, filename) => {
   const exists = existsSync(dir)
 
   try {
-    // 🗑 Plugin eliminado
     if (!exists) {
       if (isExisting) {
         delete global.plugins[filename]
@@ -377,7 +352,6 @@ global.reload = async (_ev, filename) => {
       return
     }
 
-    // 🔍 Validar sintaxis antes de importar
     const code = readFileSync(dir, 'utf8')
     const err = syntaxerror(code, filename, {
       sourceType: 'module',
@@ -385,24 +359,21 @@ global.reload = async (_ev, filename) => {
     })
 
     if (err) {
-  const { line, column, message } = err
+      const { line, column, message } = err
+      const lines = code.split('\n')
+      const errorLine = lines[line - 1]
 
-  // Obtener líneas del código
-  const lines = code.split('\n')
-  const errorLine = lines[line - 1]
+      console.log(
+        chalk.red.bold(`❌ Error de sintaxis en ${filename}`) +
+        `\n${chalk.yellow(`📍 Línea: ${line}, Columna: ${column}`)}` +
+        `\n${chalk.gray(message)}` +
+        `\n\n${chalk.white(errorLine)}` +
+        `\n${' '.repeat(column - 1)}${chalk.red('^')}`
+      )
 
-  console.log(
-    chalk.red.bold(`❌ Error de sintaxis en ${filename}`) +
-    `\n${chalk.yellow(`📍 Línea: ${line}, Columna: ${column}`)}` +
-    `\n${chalk.gray(message)}` +
-    `\n\n${chalk.white(errorLine)}` +
-    `\n${' '.repeat(column - 1)}${chalk.red('^')}`
-  )
+      return
+    }
 
-  return
-}
-
-    // ♻ Import dinámico con cache-bust
     const module = await import(`${global.__filename(dir)}?update=${Date.now()}`)
     global.plugins[filename] = module.default || module
 
@@ -427,19 +398,16 @@ global.reload = async (_ev, filename) => {
       chalk.gray(e.message)
     )
   } finally {
-    // 🔤 Ordenar plugins alfabéticamente
     global.plugins = Object.fromEntries(
       Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b))
     )
   }
 }
-//---
 
 Object.freeze(global.reload)
 watch(pluginFolder, global.reload)
 await global.reloadHandler()
 
-// Quick Test
 async function _quickTest() {
   const start = Date.now()
 
@@ -481,7 +449,6 @@ async function _quickTest() {
     chalk.cyan.bold('━━━━━━━━━━━━━━━━━━━━━━')
   )
 
-  // Advertencias solo si algo falla
   if (!ffmpeg)
     conn.logger.warn('Instala FFmpeg para enviar videos.')
 
@@ -491,7 +458,6 @@ async function _quickTest() {
   if (!imageMagick)
     conn.logger.warn('Instala ImageMagick o GraphicsMagick para stickers.')
 }
-//--
 
 _quickTest()
   .then(() => console.log('✅ Prueba rápida realizada!'))
