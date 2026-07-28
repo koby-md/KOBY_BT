@@ -1,7 +1,15 @@
 import axios from 'axios'
+import {
+  prepareWAMessageMedia,
+  generateWAMessageFromContent
+} from '@whiskeysockets/baileys'
 
 let handler = async (m, { conn }) => {
   try {
+    await m.react('⏳')
+    // إذا كان متغير wait غير معرف كمتغير عام، يمكنك تغييره إلى نص مثل 'الرجاء الانتظار...'
+    if (typeof wait !== 'undefined') await m.reply(wait) 
+
     const page = await axios.get('https://ibb.co/hJszTg0K')
 
     const match = page.data.match(
@@ -11,33 +19,96 @@ let handler = async (m, { conn }) => {
     if (!match) throw 'Image not found'
 
     const imageUrl = match[1]
-    await m.react('⏳')
-    await m.reply (wait)
-    await conn.sendMessage(
+
+    // تجهيز الصورة كرسالة ميديا للأزرار
+    const media = await prepareWAMessageMedia(
+      {
+        image: { url: imageUrl }
+      },
+      {
+        upload: conn.waUploadToServer
+      }
+    )
+
+    // إنشاء رسالة الأزرار التفاعلية
+    const msg = generateWAMessageFromContent(
       m.chat,
       {
-        image: { url: imageUrl },
-        caption: `
-╭━━━〔 📥 أوامر التنزيل 〕━━━╮
+        viewOnceMessage: {
+          message: {
+            interactiveMessage: {
+              header: {
+                hasMediaAttachment: true,
+                imageMessage: media.imageMessage,
+                title: 'اذا اردت تنزيل فيدو من ig،fb,yt,tk ارسل فقط رابط 🤍'
+              },
 
-> 🎵 .play {هذا لتنزيل اغاني من يوتيب}
-> 🪩 .t {هذا للترجمعة نحو جميع لغات}
-> 🧬 .tomp3 {هذا لتحويل المقطع الى صوت}
-> 🤍 <url>  ويمكنك تنزيل الفديوهات خاصة ب{ instagram /facebook/tiktok/youtube }عن طريق ارسال الرابط مباشرة دون امر
+              body: {
+                text: 
+`╭━━━〔 📥 أوامر البوت 〕━━━╮
 
-╰━━━━━━━━━━━━━━━━━━╯
-`
+> 🎵 هذا لتنزيل أغاني من يوتيوب
+> 🪩 هذا للترجمة نحو جميع اللغات
+> 🧬 هذا لتحويل المقطع إلى صوت
+
+╰━━━━━━━━━━━━━━━━━━╯`
+              },
+
+              footer: {
+                text: 'اختر أحد الأوامر من الأزرار أسفله'
+              },
+
+              nativeFlowMessage: {
+                buttons: [
+                  {
+                    name: 'quick_reply',
+                    buttonParamsJson: JSON.stringify({
+                      display_text: '🎵 .play',
+                      id: '.play'
+                    })
+                  },
+                  {
+                    name: 'quick_reply',
+                    buttonParamsJson: JSON.stringify({
+                      display_text: '🪩 .t',
+                      id: '.t'
+                    })
+                  },
+                  {
+                    name: 'quick_reply',
+                    buttonParamsJson: JSON.stringify({
+                      display_text: '🧬 .tomp3',
+                      id: '.tomp3'
+                    })
+                  }
+                ]
+              }
+            }
+          }
+        }
       },
-      { quoted: m }
+      {
+        userJid: conn.user.jid,
+        quoted: m
+      }
     )
+
+    // إرسال الرسالة
+    await conn.relayMessage(
+      m.chat,
+      msg.message,
+      { messageId: msg.key.id }
+    )
+    
     await m.react('📜')
+
   } catch (e) {
     console.error(e)
-    m.reply('❌ فشل إرسال الصورة')
+    m.reply('❌ فشل إرسال القائمة')
   }
 }
 
-handler.command = ['menu']
+handler.command = ['o']
 handler.help = ['menu']
 handler.tags = ['main']
 
