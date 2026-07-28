@@ -40,7 +40,7 @@ let handler = async (m, { conn }) => {
               header: {
                 hasMediaAttachment: true,
                 imageMessage: media.imageMessage,
-                title: 'اذا اردت تنزيل فيدو من ig،fb,yt,tk ارسل فقط رابط 🤍'
+                title: 'اذا اردت تنزيل فيدو من < ig،fb,yt,tk >ارسل فقط رابط 🤍'
               },
 
               body: {
@@ -48,7 +48,6 @@ let handler = async (m, { conn }) => {
 `╭━━━〔 📥 أوامر البوت 〕━━━╮
 
 > 🎵 هذا لتنزيل أغاني من يوتيوب
-> 🪩 هذا للترجمة نحو جميع اللغات
 > 🧬 هذا لتحويل المقطع إلى صوت
 
 ╰━━━━━━━━━━━━━━━━━━╯`
@@ -67,13 +66,7 @@ let handler = async (m, { conn }) => {
                       id: '.play'
                     })
                   },
-                  {
-                    name: 'quick_reply',
-                    buttonParamsJson: JSON.stringify({
-                      display_text: '🪩 .t',
-                      id: '.t'
-                    })
-                  },
+                  
                   {
                     name: 'quick_reply',
                     buttonParamsJson: JSON.stringify({
@@ -108,7 +101,7 @@ let handler = async (m, { conn }) => {
   }
 }
 
-handler.command = ['o']
+handler.command = ['menu']
 handler.help = ['menu']
 handler.tags = ['main']
 
