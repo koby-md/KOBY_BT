@@ -45,16 +45,11 @@ let handler = async (m, { conn }) => {
 
               body: {
                 text: 
-`╭━━━〔 📥 أوامر البوت 〕━━━╮
-
-> 🎵 هذا لتنزيل أغاني من يوتيوب
-> 🧬 هذا لتحويل المقطع إلى صوت
-
-╰━━━━━━━━━━━━━━━━━━╯`
+`📥`
               },
 
               footer: {
-                text: 'اختر أحد الأوامر من الأزرار أسفله'
+                text: 'اختر أحد الأوامر من الأزرار أسفله <'
               },
 
               nativeFlowMessage: {
@@ -64,6 +59,13 @@ let handler = async (m, { conn }) => {
                     buttonParamsJson: JSON.stringify({
                       display_text: '🎵 .play',
                       id: '.play'
+                    })
+                  },
+{
+                    name: 'quick_reply',
+                    buttonParamsJson: JSON.stringify({
+                      display_text: '🧶 .tr',
+                      id: '.tr'
                     })
                   },
                   
