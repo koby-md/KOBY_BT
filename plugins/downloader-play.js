@@ -2,7 +2,7 @@ import yts from 'yt-search';
 
 let handler = async (m, { conn, usedPrefix, text }) => {
     if (!text) {
-        return conn.reply(m.chat, 'Please provide the name of a YouTube video or channel.', m);
+        return conn.reply(m.chat, '> للتنزيل من يوتيب ❇️', m);
     }
 
     try {
