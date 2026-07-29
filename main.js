@@ -1,3 +1,4 @@
+//-- process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 import './config.js'; 
 import { createRequire } from "module"; // Bring in the ability to create the 'require' method
 import path, { join } from 'path'
@@ -221,41 +222,28 @@ setInterval(async () => {
         //console.log(chalk.cyan(`✅  Auto clear  | Se limpio la carpeta tmp`))
 }, 60000) //1 munto
 
+
+
 async function connectionUpdate(update) {
   const { connection, lastDisconnect } = update
 
-  if (connection === 'connecting') {
-    console.log('🟡 Connecting...')
+  if (connection === 'close') {
+    const shouldReconnect =
+      lastDisconnect?.error?.output?.statusCode !==
+      DisconnectReason.loggedOut
+
+    if (shouldReconnect) {
+      console.log('♻ Reconectando...')
+      global.reloadHandler(true)
+    } else {
+      console.log('❌ Sesión cerrada. Borra la carpeta sessions.')
+    }
   }
 
   if (connection === 'open') {
     console.log('🟢 BOT CONECTADO')
   }
-
-  if (connection === 'close') {
-    console.log('🔴 Connection Closed')
-
-    const statusCode =
-      lastDisconnect?.error?.output?.statusCode ||
-      lastDisconnect?.error?.data?.statusCode ||
-      lastDisconnect?.error?.statusCode
-
-    console.log('Status Code:', statusCode)
-
-    if (statusCode === DisconnectReason.loggedOut) {
-      console.log('❌ Logged Out')
-      return
-    }
-
-    console.log('♻ Reconectando en 3 segundos...')
-
-    setTimeout(() => {
-      global.reloadHandler(true)
-    }, 3000)
-  }
-}
-
- //-- cu 
+} //-- cu 
 
 process.on('uncaughtException', console.error)
 // let strQuot = /(["'])(?:(?=(\\?))\2.)*?\1/
@@ -271,23 +259,19 @@ global.reloadHandler = async function (restatConn) {
   }
 
  if (restatConn) {
-  try {
-    global.conn.ws.close()
-  } catch {}
-
-  try {
-    global.conn.ev.removeAllListeners()
-  } catch {}
+  try { global.conn.ws.close() } catch {}
+  conn.ev.removeAllListeners()
 
   global.conn = makeWASocket(connectionOptions)
 
-  store.bind(global.conn)
-  global.conn.store = store
+store.bind(global.conn)
+global.conn.store = store
 
   global.conn.ev.on('creds.update', saveCreds)
 
   isInit = true
 }
+
   if (!isInit) {
     conn.ev.off('messages.upsert', conn.handler)
     conn.ev.off('group-participants.update', conn.participantsUpdate)
