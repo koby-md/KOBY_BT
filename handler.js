@@ -16,7 +16,7 @@ const delay = ms => isNumber(ms) && new Promise(resolve => setTimeout(function (
     clearTimeout(this)
     resolve()
 }, ms))
- 
+
 /**
  * Handle messages upsert
  * @param {import('@whiskeysockets/baileys').BaileysEventMap<unknown>['messages.upsert']} groupsUpdate 
@@ -45,9 +45,9 @@ global.db.data.chats ||= {}
 global.db.data.stats ||= {} 
 global.db.data.settings ||= {}
 global.db.data.statsMsg ||= {} //contador de mensaje por grupo
-    
 
-    
+
+
     try {
         m = smsg(this, m) || m
         if (!m)
@@ -154,11 +154,12 @@ const text = typeof m.text === 'string' ? m.text : ''
 m.text = text
 
 // Modo escucha (no responde nada)
-if (opts.nyimak) return
+// if (opts.nyimak) return
 // Modo self (solo responde a sí mismo)
-if (opts.self && !m.fromMe) return
+// if (opts.self && !m.fromMe) return
 // Solo privado
-if (settings.solopv && isGroup) return
+// if (settings.solopv && isGroup) return
+
 // Solo grupos (con excepciones permitidas en privado)
 if (settings.sologp && !isGroup) {
 
@@ -223,7 +224,7 @@ const isPrems = isROwner || global.prems.map(v => normalize(v)).includes(sender)
         m.exp += Math.ceil(Math.random() * 10)
 
         let usedPrefix
-        
+
         const groupMetadata = m.isGroup ? await this.groupMetadata(m.chat).catch(() => null) : null
         const participants = groupMetadata?.participants || []
 const user = (m.isGroup ? participants.find(u => { let id = this.decodeJid(u.id || u.jid); return [this.decodeJid(m.sender), this.decodeJid(m.key?.participant), this.decodeJid(m.participant)].filter(Boolean).includes(id) }) : {}) || {}
@@ -235,7 +236,7 @@ const isBotAdmin = !!bot?.admin
 
 
         const ___dirname = path.join(path.dirname(fileURLToPath(import.meta.url)), './plugins')
-        
+
         for (let name in global.plugins) {
             let plugin = global.plugins[name]
             if (!plugin)
@@ -261,10 +262,10 @@ const isBotAdmin = !!bot?.admin
                     // global.dfail('restrict', m, this)
                     continue
                 }
-                
+
             const str2Regex = str => str.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&')
             let _prefix = plugin.customPrefix ? plugin.customPrefix : conn.prefix ? conn.prefix : global.prefix
-            
+
             let match = (_prefix instanceof RegExp ? // RegExp Mode?
                 [[_prefix.exec(m.text), _prefix]] :
                 Array.isArray(_prefix) ? // Array?
@@ -303,7 +304,7 @@ const isBotAdmin = !!bot?.admin
             if (typeof plugin !== 'function')
                 continue
 
-            
+
             if ((usedPrefix = (match[0] || '')[0])) {
                 let noPrefix = m.text.replace(usedPrefix, '')
                 let [command, ...args] = noPrefix.trim().split` `.filter(v => v)
@@ -456,7 +457,7 @@ const isBotAdmin = !!bot?.admin
                 user.diamond -= m.diamond * 1
             }
 
-       
+
 // 📊 CONTADOR DE MENSAJES POR GRUPO
 if (m.isGroup && m.sender) {
     let statsMsg = global.db.data.statsMsg || {}
@@ -636,7 +637,7 @@ export async function deleteUpdate(update) {
     try {
         const { key, update: msgUpdate } = update || {}
 
-       
+
         if (!key || !msgUpdate) return
         const { remoteJid, id, participant, fromMe } = key
 
