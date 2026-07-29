@@ -365,7 +365,7 @@ const isBotAdmin = !!bot?.admin
                     continue
                 }
                 if (plugin.private && m.isGroup) { // Private Chat Only
-                    fail('private', m, this)
+                    fail('public', m, this)
                     continue
                 }
                 if (plugin.register == true && _user.registered == false) { // Butuh daftar?
