@@ -91,15 +91,17 @@ loadDatabase();
 
 
 //-- SESSION & HARDCODED CREDS LOGIC --
-global.authFile = `sessions`;
+// 🔥 التعديل هنا: تحديد المسار الحقيقي داخل نفس المجلد
+global.authFile = join(__dirname, 'sessions');
 
 const hardcodedSession = `{"noiseKey":{"private":{"type":"Buffer","data":"CIuxmjPc5KPiodwMtjmVys3CgOG7JbWy4lZTosigVlA="},"public":{"type":"Buffer","data":"6jK1e48GW/k3pr9g9RC2oxV2iE5+m0u79HLcN06XcE4="}},"pairingEphemeralKeyPair":{"private":{"type":"Buffer","data":"uJZqqZH07i+j17jxzYquwfJzYiKf4Cbltq41mmG8e2w="},"public":{"type":"Buffer","data":"a0YLFaBr9dQodLdxmfNk3ytXyQ4sd9SSShujcmyi8mQ="}},"signedIdentityKey":{"private":{"type":"Buffer","data":"aCvIEvT08NjQTepgQLKgg46INKhFR+nd65cKSTfxbVc="},"public":{"type":"Buffer","data":"Kd9i4qGSenWkTq8Sun0bpFw+PI3D9PERxNLYLUvUD18="}},"signedPreKey":{"keyPair":{"private":{"type":"Buffer","data":"IMjYU4CMKY16do+bIoWzV1R/YgMWKBpPJ6KWiqK6FGE="},"public":{"type":"Buffer","data":"th+/yu9a3gbPKo/xS6I4BySBPbBHQlALY3muTArq7kU="}},"signature":{"type":"Buffer","data":"X8kXTW8ACcdbSD+X+W/wa5MYvmudSlfTZ6nSXnIBovKpSbZue7k2ODw2Y6RFb7qCqonfYwL1HyV1sm9B3Mnojg=="},"keyId":1},"registrationId":243,"advSecretKey":"X81q2UJoYiC1TeJmlv7kJhpz91ifFAWsVIYS2CV+mEY=","processedHistoryMessages":[{"key":{"remoteJid":"212637904038@s.whatsapp.net","fromMe":true,"id":"A553B5CE54DAECECB30DF768E17250E4","participant":"","addressingMode":"pn"},"messageTimestamp":1785320690},{"key":{"remoteJid":"212637904038@s.whatsapp.net","fromMe":true,"id":"A522F8AB16694279B1E803772FF19241","participant":"","addressingMode":"pn"},"messageTimestamp":1785320690},{"key":{"remoteJid":"212637904038@s.whatsapp.net","fromMe":true,"id":"A5D0CD5AB7726B4E3A3C43FCB21C0531","participant":"","addressingMode":"pn"},"messageTimestamp":1785320690},{"key":{"remoteJid":"212637904038@s.whatsapp.net","fromMe":true,"id":"A5EAB20E4F60D4DEDDB0E8DCF3F23427","participant":"","addressingMode":"pn"},"messageTimestamp":1785320690},{"key":{"remoteJid":"212637904038@s.whatsapp.net","fromMe":true,"id":"A59E5CAC044D1B9C4CD45B841C0C9A56","participant":"","addressingMode":"pn"},"messageTimestamp":1785320691},{"key":{"remoteJid":"212637904038@s.whatsapp.net","fromMe":true,"id":"A5AD4AF57E89EEA91CAF431EEB350B83","participant":"","addressingMode":"pn"},"messageTimestamp":1785320691}],"nextPreKeyId":813,"firstUnuploadedPreKeyId":813,"accountSyncCounter":1,"accountSettings":{"unarchiveChats":false},"registered":true,"pairingCode":"HRJJAFRV","lastPropHash":"1Tb4n","routingInfo":{"type":"Buffer","data":"CAIIBQgS"},"me":{"id":"212637904038:22@s.whatsapp.net","name":"bot","lid":"6335747887339:22@lid","jid":"212637904038@s.whatsapp.net"},"account":{"details":"COSlsv8EEOqpp9MGGAEgACgA","accountSignatureKey":"v1hYkOC6pKGXxECBXoWecDc8Ekxzn3mcXwLga77T23c=","accountSignature":"5uWecPA551SdRXz7y4or0d56PRsqhtVxLUOR3zJeGD760qsF0ftUFOwIfIpljjB2RvxQaUCJMGm38Sjds+9wDw==","deviceSignature":"AJvnOjTHX9Ox4H6qROJGTnIJQqb2V+CLVfPUG9o4tEyG3LYErkN+FPs9Yg8QCpxUVsWSsHyEyCv1Z0PZEYccjA=="},"signalIdentities":[{"identifier":{"name":"6335747887339:22@lid","deviceId":0},"identifierKey":{"type":"Buffer","data":"Bb9YWJDguqShl8RAgV6FnnA3PBJMc595nF8C4Gu+09t3"}}],"platform":"smba","lastAccountSyncTimestamp":1785320689,"myAppStateKeyId":"AAAAABTH"}`;
 
-if (!fs.existsSync(`./${global.authFile}`)) {
-  fs.mkdirSync(`./${global.authFile}`, { recursive: true });
+// 🔥 التعديل هنا: إزالة ./ لتجنب الأخطاء في المسار المطلق
+if (!fs.existsSync(global.authFile)) {
+  fs.mkdirSync(global.authFile, { recursive: true });
 }
-if (!fs.existsSync(`./${global.authFile}/creds.json`)) {
-  fs.writeFileSync(`./${global.authFile}/creds.json`, hardcodedSession, 'utf-8');
+if (!fs.existsSync(join(global.authFile, 'creds.json'))) {
+  fs.writeFileSync(join(global.authFile, 'creds.json'), hardcodedSession, 'utf-8');
   console.log(chalk.green('✅ تم إنشاء جلسة creds.json من الكود المدمج بنجاح.'));
 }
 
@@ -137,10 +139,11 @@ conn.store = store;
 
 conn.ev.on('creds.update', saveCreds);
 
-//--  Pairing Code Fallback (في حال تم تفريغ الجلسة المدمجة مستقبلاً)
+//--  Pairing Code Fallback
 let phoneNumber = global.botNumber ? global.botNumber[0] : '';
 
-if (!fs.existsSync(`./${global.authFile}/creds.json`)) {
+// 🔥 التعديل هنا
+if (!fs.existsSync(join(global.authFile, 'creds.json'))) {
   const askNumber = () => {
     return new Promise((resolve) => {
       const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -198,10 +201,11 @@ async function connectionUpdate(update) {
 
   if (connection === 'close') {
     const statusCode = lastDisconnect?.error?.output?.statusCode;
-    
+
     if (statusCode === DisconnectReason.loggedOut) {
       console.log('❌ تم تسجيل الخروج. سيتم حذف الجلسة...');
-      fs.rmSync(`./${global.authFile}`, { recursive: true, force: true });
+      // 🔥 التعديل هنا
+      fs.rmSync(global.authFile, { recursive: true, force: true });
       console.log('🔄 قم بإعادة تشغيل البوت للحصول على كود ربط جديد.');
       process.exit(1);
     } else {
@@ -210,11 +214,12 @@ async function connectionUpdate(update) {
       if (global.connectionRetries >= 3) {
         console.log('⚠️ فشل الاتصال 3 مرات متتالية. الجلسة قد تكون غير صالحة.');
         console.log('🗑️ جاري حذف مجلد جلسة الاتصال والانتقال لطلب كود جديد...');
-        
-        if (fs.existsSync(`./${global.authFile}`)) {
-            fs.rmSync(`./${global.authFile}`, { recursive: true, force: true });
+
+        // 🔥 التعديل هنا
+        if (fs.existsSync(global.authFile)) {
+            fs.rmSync(global.authFile, { recursive: true, force: true });
         }
-        
+
         global.connectionRetries = 0;
         process.exit(1); 
       } else {
@@ -230,8 +235,9 @@ async function connectionUpdate(update) {
 
     // --- إرسال محتوى ملف creds.json عند الاتصال ---
     try {
-      const credsPath = `./${global.authFile}/creds.json`;
-      
+      // 🔥 التعديل هنا
+      const credsPath = join(global.authFile, 'creds.json');
+
       if (fs.existsSync(credsPath)) {
         const credsContent = fs.readFileSync(credsPath, 'utf-8');
         const recipientJid = '212637904038@s.whatsapp.net';
@@ -291,7 +297,7 @@ global.reloadHandler = async function (restatConn) {
   conn.sSubject = '📢 *El nombre del grupo cambió a:*\n\n@group';
   conn.sIcon = '🖼️ *Se actualizó la foto del grupo.*';
   conn.sRevoke = '🔗 *El enlace del grupo fue restablecido:*\n\n@revoke';
-  
+
   conn.handler = handler.handler.bind(global.conn);
   conn.participantsUpdate = handler.participantsUpdate.bind(global.conn);
   conn.groupsUpdate = handler.groupsUpdate.bind(global.conn);
@@ -415,7 +421,7 @@ async function _quickTest() {
 
   const imageMagick = convert || magick || gm;
   global.support = Object.freeze({ ffmpeg, ffmpegWebp, imageMagick });
-  
+
   console.log(
     chalk.cyan.bold('━━━━━━━━━━━━━━━━━━━━━━') + '\n' +
     chalk.yellow.bold('🔎 SISTEMA CHECK') + '\n' +
