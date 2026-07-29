@@ -197,10 +197,11 @@ const botNumber = this.user?.id?.replace(/:[0-9]+/g, '') || ''
 const sender = ((await conn.getJid(m.sender)) || m.sender).split(':')[0] + '@s.whatsapp.net'
 const normalize = v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net'
 
-const isROwner = sender === botNumber || global.owner.some(v => sender === normalize(Array.isArray(v) ? v[0] : v))
+// 🟢 الإصلاح الجذري لمشكل التوقف (TypeError: Cannot read properties of undefined)
+const isROwner = sender === botNumber || (global.owner || []).some(v => sender === normalize(Array.isArray(v) ? v[0] : v))
 const isOwner = isROwner || m.fromMe
-const isMods = isOwner || global.mods.map(v => normalize(v)).includes(sender)
-const isPrems = isROwner || global.prems.map(v => normalize(v)).includes(sender) || (_user?.prem === true)
+const isMods = isOwner || (global.mods || []).map(v => normalize(v)).includes(sender)
+const isPrems = isROwner || (global.prems || []).map(v => normalize(v)).includes(sender) || (_user?.prem === true)
 
 
         if (opts['queque'] && m.text && !(isMods || isPrems)) {
@@ -209,14 +210,13 @@ const isPrems = isROwner || global.prems.map(v => normalize(v)).includes(sender)
             queque.push(m.id || m.key.id)
 
             if (opts.queque && m.text && !(isMods || isPrems)) {
-   let previousID = this.msgqueque[this.msgqueque.length - 1]
-   this.msgqueque.push(m.id || m.key.id)
+               let previousID = this.msgqueque[this.msgqueque.length - 1]
+               this.msgqueque.push(m.id || m.key.id)
 
-   while (this.msgqueque.includes(previousID)) {
-      await delay(5000)
-   }
-}
-
+               while (this.msgqueque.includes(previousID)) {
+                  await delay(5000)
+               }
+            }
         }
 
         if (m.isBaileys)
@@ -227,12 +227,12 @@ const isPrems = isROwner || global.prems.map(v => normalize(v)).includes(sender)
 
         const groupMetadata = m.isGroup ? await this.groupMetadata(m.chat).catch(() => null) : null
         const participants = groupMetadata?.participants || []
-const user = (m.isGroup ? participants.find(u => { let id = this.decodeJid(u.id || u.jid); return [this.decodeJid(m.sender), this.decodeJid(m.key?.participant), this.decodeJid(m.participant)].filter(Boolean).includes(id) }) : {}) || {}
-const bot = (m.isGroup ? participants.find(u => { let id = this.decodeJid(u.id || u.jid); return id === this.decodeJid(this.user.jid) || id === this.decodeJid(this.user.lid) }) : {}) || {}
+        const user = (m.isGroup ? participants.find(u => { let id = this.decodeJid(u.id || u.jid); return [this.decodeJid(m.sender), this.decodeJid(m.key?.participant), this.decodeJid(m.participant)].filter(Boolean).includes(id) }) : {}) || {}
+        const bot = (m.isGroup ? participants.find(u => { let id = this.decodeJid(u.id || u.jid); return id === this.decodeJid(this.user.jid) || id === this.decodeJid(this.user.lid) }) : {}) || {}
 
-const isRAdmin = user?.admin === 'superadmin' || this.decodeJid(groupMetadata?.owner) === this.decodeJid(m.sender)
-const isAdmin = !!user?.admin || this.decodeJid(groupMetadata?.owner) === this.decodeJid(m.sender)
-const isBotAdmin = !!bot?.admin
+        const isRAdmin = user?.admin === 'superadmin' || this.decodeJid(groupMetadata?.owner) === this.decodeJid(m.sender)
+        const isAdmin = !!user?.admin || this.decodeJid(groupMetadata?.owner) === this.decodeJid(m.sender)
+        const isBotAdmin = !!bot?.admin
 
 
         const ___dirname = path.join(path.dirname(fileURLToPath(import.meta.url)), './plugins')
@@ -722,4 +722,4 @@ watchFile(file, async () => {
     unwatchFile(file)
     console.log(chalk.magenta("✅  Se actualizo 'handler.js'"))
     if (global.reloadHandler) console.log(await global.reloadHandler())
-}) 
+})
