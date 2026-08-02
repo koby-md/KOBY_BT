@@ -38,7 +38,7 @@
   ],
   "dependencies": {
     "@vitalets/google-translate-api": "^9.2.1",
-           "@whiskeysockets/baileys":"npm:@itsliaaa/starcore",
+           "@whiskeysockets/baileys":"github:itsliaaa/starcore",
     "@vitalets/google-translate-api": "^8.0.0",
     "archiver": "^7.0.1",
     "awesome-phonenumber": "^3.4.0",
