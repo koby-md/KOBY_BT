@@ -109,8 +109,6 @@ export async function handler(chatUpdate) {
         const text = typeof m.text === 'string' ? m.text : ''
         m.text = text
 
-        // 🟢 تم إزالة جميع فلاتر (sologp, solopv, swonly, nyimak) لضمان استجابة البوت للجميع
-
         if (!global.db.data.users[m.sender]) {
             global.db.data.users[m.sender] = {
                 exp: 0,
@@ -122,9 +120,21 @@ export async function handler(chatUpdate) {
 
         let _user = global.db.data && global.db.data.users && global.db.data.users[m.sender]
 
-        const botNumber = this.user?.id?.replace(/:[0-9]+/g, '') || ''
-        const sender = ((await conn.getJid(m.sender)) || m.sender).split(':')[0] + '@s.whatsapp.net'
-        const normalize = v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net'
+        // 🟢 التعديل الخاص بإصلاح مشكلة الـ @lid والرد في الخاص
+        const botNumber = this.user?.id?.split(':')[0] + '@s.whatsapp.net'
+        const sender = m.sender ? (m.sender.includes('@lid') ? m.sender.split(':')[0] + '@lid' : m.sender.split(':')[0] + '@s.whatsapp.net') : ''
+        const normalize = v => {
+            if (typeof v !== 'string') return String(v)
+            if (v.includes('@lid')) return v.split(':')[0] + '@lid'
+            return v.replace(/[^0-9]/g, '') + '@s.whatsapp.net'
+        }
+
+        if (m.chat && m.chat.includes('@lid')) {
+            m.chat = m.chat.split(':')[0] + '@lid'
+        } else if (m.chat && !m.chat.endsWith('@g.us')) {
+            m.chat = m.chat.split(':')[0] + '@s.whatsapp.net'
+        }
+        // 🟢 نهاية التعديل
 
         const isROwner = sender === botNumber || (global.owner || []).some(v => sender === normalize(Array.isArray(v) ? v[0] : v))
         const isOwner = isROwner || m.fromMe
@@ -226,8 +236,6 @@ export async function handler(chatUpdate) {
                 if (!isAccept)
                     continue
                 m.plugin = name
-
-                // 🟢 تم إزالة شرط الحظر (isBanned) نهائياً لضمان عدم تجاهل أي شخص
 
                 if (plugin.rowner && plugin.owner && !(isROwner || isOwner)) { 
                     fail('owner', m, this)
