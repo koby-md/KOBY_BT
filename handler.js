@@ -60,7 +60,7 @@ export async function handler(chatUpdate) {
                 afkReason: '',
                 banned: false,
                 level: 0,
-                role: 'Novato',
+                role: 'مبتدئ',
                 autolevelup: false,
             }
 
@@ -278,15 +278,15 @@ export async function handler(chatUpdate) {
                 m.isCommand = true
                 let xp = 'exp' in plugin ? parseInt(plugin.exp) : 17 
                 if (xp > 200)
-                    m.reply('chirrido -_-') 
+                    m.reply('تجاوزت الحد المسموح -_-') 
                 else
                     m.exp += xp
                 if (!isPrems && plugin.diamond && global.db.data.users[m.sender].diamond < plugin.diamond * 1) {
-                    this.reply(m.chat, `✳️ Tus diamantes se agotaron\nuse el siguiente comando para comprar más diamantes\n\n*${usedPrefix}buy*`, m)
+                    this.reply(m.chat, `✳️ لقد نفذت مجوهراتك 💎\nاستخدم الأمر التالي لشراء المزيد من المجوهرات:\n\n*${usedPrefix}buy*`, m)
                     continue 
                 }
                 if (plugin.level > _user.level) {
-                    this.reply(m.chat, `✳️ nivel requerido ${plugin.level} para usar este comando. \nTu nivel ${_user.level}`, m)
+                    this.reply(m.chat, `✳️ هذا الأمر يتطلب المستوى ${plugin.level} لاستخدامه.\nمستواك الحالي هو: ${_user.level}`, m)
                     continue 
                 }
                 let extra = {
@@ -334,7 +334,7 @@ export async function handler(chatUpdate) {
                         }
                     }
                     if (m.diamond)
-                        m.reply(`Usaste *${+m.diamond}* 💎`)
+                        m.reply(`تم استهلاك *${+m.diamond}* 💎`)
                 }
                 break
             }
@@ -402,7 +402,7 @@ export async function handler(chatUpdate) {
 
 export async function participantsUpdate({ id, participants, action }) {
     if (opts['self']) return
-    if (global.db.data == null) await loadDatabase()
+    if (global.db.data == null) await global.loadDatabase()
 
     let chat = global.db.data.chats[id] || {}
     let text = ''
@@ -412,28 +412,28 @@ export async function participantsUpdate({ id, participants, action }) {
         case 'add':
         case 'remove':
             if (!chat.welcome) break
-            let groupMetadata = await this.groupMetadata(id).catch(_ => null) || (conn.chats[id] || {}).metadata
+            let groupMetadata = await this.groupMetadata(id).catch(_ => null) || (global.conn.chats[id] || {}).metadata
             if (!groupMetadata) return
 
             for (let participant of participants) {
                 const user = normalize(participant)
                 if (!user) continue
 
-                let pp = fg_avatar
-                let ppgp = fg_avatar
+                let pp = global.fg_avatar || 'https://i.ibb.co/fkFmQC2/eve.jpg'
+                let ppgp = global.fg_avatar || 'https://i.ibb.co/fkFmQC2/eve.jpg'
                 try { pp = await this.profilePictureUrl(user, 'image') } catch {}
                 try { ppgp = await this.profilePictureUrl(id, 'image') } catch {}
 
                 text = (action === 'add'
-                    ? (chat.sWelcome || this.welcome || conn.welcome || 'Bienvenido, @user')
+                    ? (chat.sWelcome || this.welcome || global.conn.welcome || 'مرحباً بك، @user')
                         .replace('@group', await this.getName(id))
-                        .replace('@desc', groupMetadata.desc?.toString() || 'Desconocido')
-                    : (chat.sBye || this.bye || conn.bye || 'Adiós, @user')
+                        .replace('@desc', groupMetadata.desc?.toString() || 'غير متوفر')
+                    : (chat.sBye || this.bye || global.conn.bye || 'وداعاً، @user')
                 ).replace('@user', '@' + user.split('@')[0])
 
                 try {
                     let imageUrl = action === 'add'
-                        ? API('fgmods', '/api/welcome', {
+                        ? global.API('fgmods', '/api/welcome', {
                             username: await this.getName(user),
                             groupname: await this.getName(id),
                             groupicon: ppgp,
@@ -441,7 +441,7 @@ export async function participantsUpdate({ id, participants, action }) {
                             profile: pp,
                             background: 'https://i.ibb.co/fkFmQC2/eve.jpg'
                         }, 'apikey')
-                        : API('fgmods', '/api/goodbye2', {
+                        : global.API('fgmods', '/api/goodbye2', {
                             username: await this.getName(user),
                             groupname: await this.getName(id),
                             groupicon: ppgp,
@@ -465,8 +465,8 @@ export async function participantsUpdate({ id, participants, action }) {
                 if (!user) continue
                 let pp = await this.profilePictureUrl(user, 'image').catch(_ => global.fg_avatar)
                 text = action === 'promote'
-                    ? (chat.sPromote || this.spromote || conn.spromote || '@user ahora es administrador 🛡️')
-                    : (chat.sDemote || this.sdemote || conn.sdemote || '@user ya no es administrador')
+                    ? (chat.sPromote || this.spromote || global.conn.spromote || '@user أصبح الآن مشرفاً في المجموعة 🛡️')
+                    : (chat.sDemote || this.sdemote || global.conn.sdemote || '@user تم تنزيله من الإشراف')
                 text = text.replace('@user', '@' + user.split('@')[0])
                 await this.sendFile(id, pp, 'pp.jpg', text, null, false, { mentions: [user] })
             }
@@ -481,10 +481,10 @@ export async function groupsUpdate(groupsUpdate) {
         if (!id) continue
         let chats = global.db.data.chats[id], text = ''
         if (!chats?.detect) continue
-        if (groupUpdate.desc) text = (chats.sDesc || this.sDesc || conn.sDesc).replace('@desc', groupUpdate.desc)
-        if (groupUpdate.subject) text = (chats.sSubject || this.sSubject || conn.sSubject).replace('@group', groupUpdate.subject)
-        if (groupUpdate.icon) text = (chats.sIcon || this.sIcon || conn.sIcon).replace('@icon', groupUpdate.icon)
-        if (groupUpdate.revoke) text = (chats.sRevoke || this.sRevoke || conn.sRevoke).replace('@revoke', groupUpdate.revoke)
+        if (groupUpdate.desc) text = (chats.sDesc || this.sDesc || global.conn.sDesc).replace('@desc', groupUpdate.desc)
+        if (groupUpdate.subject) text = (chats.sSubject || this.sSubject || global.conn.sSubject).replace('@group', groupUpdate.subject)
+        if (groupUpdate.icon) text = (chats.sIcon || this.sIcon || global.conn.sIcon).replace('@icon', groupUpdate.icon)
+        if (groupUpdate.revoke) text = (chats.sRevoke || this.sRevoke || global.conn.sRevoke).replace('@revoke', groupUpdate.revoke)
         if (!text) continue
         await this.sendMessage(id, { text, mentions: this.parseMention(text) })
     }
@@ -510,19 +510,19 @@ export async function deleteUpdate(update) {
         if (chat.delete) return
 
         let user = participant || remoteJid
-        let pushName = msg.pushName || 'Desconocido'
-        let type = Object.keys(msg.message || {})[0] || 'desconocido'
-        let text = msg.text || msg.message?.conversation || msg.message?.extendedTextMessage?.text || 'Sin texto'
+        let pushName = msg.pushName || 'غير معروف'
+        let type = Object.keys(msg.message || {})[0] || 'غير معروف'
+        let text = msg.text || msg.message?.conversation || msg.message?.extendedTextMessage?.text || 'بدون نص'
 
         let info = `
-≡ *ارجاع الرسائل المحذوفة*
+≡ *استرجاع الرسائل المحذوفة*
 
 ┌─⊷ 📌 *المستخدم*
-▢ *Número* : @${user.split('@')[0]}
+▢ *الرقم* : @${user.split('@')[0]}
 └─────────────
-┌─⊷ 💬 *Mensaje*
-▢ *Tipo* : ${type}
-▢ *Contenido* :👇🏻
+┌─⊷ 💬 *الرسالة*
+▢ *النوع* : ${type}
+▢ *المحتوى* :👇🏻
 └───────────
 `.trim()
 
@@ -535,16 +535,16 @@ export async function deleteUpdate(update) {
 
 global.dfail = (type, m, conn) => {
     let msg = {
-        rowner: `👑 Este comando solo puede ser utilizado por el *Creador del bot*`,
-        owner: `🔱 Este comando solo puede ser utilizado por el *Owner y Sub Bots*`,
-        mods: `🔰 Esta función es solo para *Para moderadores del Bot*`,
-        premium: `💠 Este comando es solo para miembros *Premium*\n\nEscribe */premium* para más info`,
-        group: `⚙️ Este comando solo se puede usar en grupos`,
-        private: `📮 Este comando solo se puede usar en el chat *privado del Bot*`,
-        admin: `🛡️ Este comando es solo para *Admins* del grupos`,
-        botAdmin: `💥 ¡Para usar este comando debo ser *Administrador!*`,
-        unreg: `📇 Regístrese para usar esta función  Escribiendo:\n\n*/reg*`,
-        restrict: '🔐 Esta característica está *deshabilitada*'
+        rowner: `👑 هذا الأمر مخصص فقط لـ *مطور البوت* الأساسي.`,
+        owner: `🔱 هذا الأمر مخصص فقط لـ *المطورين* (Owner / Sub Bots).`,
+        mods: `🔰 هذه الميزة مخصصة فقط لـ *مشرفي البوت*.`,
+        premium: `💠 هذا الأمر مخصص للأعضاء *المميزين (Premium)* فقط.\n\nاكتب */premium* لمزيد من المعلومات.`,
+        group: `⚙️ يمكن استخدام هذا الأمر في *المجموعات* فقط.`,
+        private: `📮 يمكن استخدام هذا الأمر في *الخاص* فقط.`,
+        admin: `🛡️ هذا الأمر مخصص فقط لـ *مشرفي المجموعة*.`,
+        botAdmin: `💥 يجب أن يكون البوت *مشرفاً* لاستخدام هذا الأمر!`,
+        unreg: `📇 الرجاء التسجيل أولاً لاستخدام هذه الميزة. للبدء اكتب:\n\n*/reg*`,
+        restrict: `🔐 هذه الميزة *معطلة* حالياً.`
     }[type]
     if (msg) return m.reply(msg)
 }
@@ -552,6 +552,6 @@ global.dfail = (type, m, conn) => {
 let file = global.__filename(import.meta.url, true)
 watchFile(file, async () => {
     unwatchFile(file)
-    console.log(chalk.magenta("✅  Se actualizo 'handler.js'"))
+    console.log(chalk.magenta("✅ تم تحديث 'handler.js'"))
     if (global.reloadHandler) console.log(await global.reloadHandler())
 })
