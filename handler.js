@@ -197,27 +197,13 @@ const botNumber = this.user?.id?.replace(/:[0-9]+/g, '') || ''
 const sender = ((await conn.getJid(m.sender)) || m.sender).split(':')[0] + '@s.whatsapp.net'
 const normalize = v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net'
 
-// 🟢 الإصلاح الجذري لمشكل التوقف (TypeError: Cannot read properties of undefined)
+// 🟢 الإصلاح الجذري لمشكل التوقف
 const isROwner = sender === botNumber || (global.owner || []).some(v => sender === normalize(Array.isArray(v) ? v[0] : v))
 const isOwner = isROwner || m.fromMe
 const isMods = isOwner || (global.mods || []).map(v => normalize(v)).includes(sender)
 const isPrems = isROwner || (global.prems || []).map(v => normalize(v)).includes(sender) || (_user?.prem === true)
 
-
-        if (opts['queque'] && m.text && !(isMods || isPrems)) {
-            let queque = this.msgqueque, time = 1000 * 5
-            const previousID = queque[queque.length - 1]
-            queque.push(m.id || m.key.id)
-
-            if (opts.queque && m.text && !(isMods || isPrems)) {
-               let previousID = this.msgqueque[this.msgqueque.length - 1]
-               this.msgqueque.push(m.id || m.key.id)
-
-               while (this.msgqueque.includes(previousID)) {
-                  await delay(5000)
-               }
-            }
-        }
+        // 🟢 تم إزالة كود الطابور (queque) المسبب للتوقف هنا
 
         if (m.isBaileys)
             return
