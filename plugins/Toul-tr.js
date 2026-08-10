@@ -15,7 +15,7 @@ const handler = async (m, { conn, args, usedPrefix, command }) => {
     return m.reply(`*🧶هذا للترجمة*\n\nيرجى كتابة النص المراد ترجمته🧶.\n*مثال:* ${usedPrefix + command} hello🧶`);
   }
 
-  // التحقق مما إذا كانت الكلمة الأولى عبارة عن رمز لغة من حرفين (مثل ar, en, fr)
+  // التحقق مما إذا كانت الكلمة الأولى عبارة عن رمز لغة من حرفين (مثل ar, en, fr, de)
   const firstWord = args[0] ? args[0].toLowerCase() : '';
   const isLangCode = firstWord.length === 2;
 
@@ -26,13 +26,13 @@ const handler = async (m, { conn, args, usedPrefix, command }) => {
 
     try {
       await m.react('⏳');
-      
+
       // الاستدعاء الخاص بمكتبة translate-google-api
       const result = await translate(textToTranslate, { to: targetLang });
-      
-      // استخراج النص المترجم (المكتبة ترجع النتيجة كمصفوفة في الغالب)
+
+      // استخراج النص المترجم
       const translatedText = Array.isArray(result) ? result[0] : result;
-      
+
       await m.reply(translatedText);
       await m.react('✅');
     } catch (error) {
@@ -40,7 +40,7 @@ const handler = async (m, { conn, args, usedPrefix, command }) => {
       await m.reply('❌ حدث خطأ أثناء الترجمة. يرجى التأكد من أن رمز اللغة صحيح.');
     }
 
-  // === الحالة الثانية: لم يتم تحديد اللغة (مثل .tr hello) -> إظهار الأزرار ===
+  // === الحالة الثانية: لم يتم تحديد اللغة -> إظهار الأزرار ===
   } else {
     const textToTranslate = fullText;
 
@@ -52,7 +52,7 @@ const handler = async (m, { conn, args, usedPrefix, command }) => {
             message: {
               interactiveMessage: {
                 body: {
-                  text: `📝 *🧶النص المراد ترجمته:🧶*\n"${textToTranslate}"\n\nإختر اللغة التي تريد الترجمة إليها من الأزرار أسفله:`
+                  text: `📝 اختر اللغة`
                 },
                 footer: {
                   text: 'بوت الترجمة 🌐'
@@ -78,6 +78,13 @@ const handler = async (m, { conn, args, usedPrefix, command }) => {
                       buttonParamsJson: JSON.stringify({
                         display_text: '🇫🇷 الفرنسية',
                         id: `${usedPrefix + command} fr ${textToTranslate}`
+                      })
+                    },
+                    {
+                      name: 'quick_reply',
+                      buttonParamsJson: JSON.stringify({
+                        display_text: '🇩🇪 الألمانية',
+                        id: `${usedPrefix + command} de ${textToTranslate}`
                       })
                     }
                   ]
