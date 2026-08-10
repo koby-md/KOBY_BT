@@ -1,442 +1,1630 @@
-//-- process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-import './config.js'; 
-import { createRequire } from "module"; 
+import './config.js';
+
+import { createRequire } from 'module';
 import path, { join } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { platform } from 'process';
+
 import * as ws from 'ws';
 import chalk from 'chalk';
-import { readdirSync, statSync, unlinkSync, existsSync, readFileSync, watch, rmSync, mkdirSync, writeFileSync } from 'fs';
+
+import {
+    readdirSync,
+    statSync,
+    unlinkSync,
+    existsSync,
+    readFileSync,
+    watch,
+    rmSync,
+    mkdirSync
+} from 'fs';
+
+import fs from 'fs';
+
 import yargs from 'yargs';
 import { spawn } from 'child_process';
 import lodash from 'lodash';
 import syntaxerror from 'syntax-error';
 import { tmpdir } from 'os';
-import { format } from 'util';
 
 import { makeWASocket } from './lib/simple.js';
 import { protoType, serialize } from './lib/simple.js';
 
 import { Low, JSONFile } from 'lowdb';
 import pino from 'pino';
+
 import { mongoDB, mongoDBV2 } from './lib/mongoDB.js';
 import store from './lib/store.js';
+
 import readline from 'readline';
 
 const {
     useMultiFileAuthState,
     DisconnectReason,
     fetchLatestBaileysVersion,
-    makeCacheableSignalKeyStore, 
+    makeCacheableSignalKeyStore,
     jidNormalizedUser
 } = await import('@whiskeysockets/baileys');
+
 import moment from 'moment-timezone';
 import NodeCache from 'node-cache';
-import fs from 'fs';
+
 const { chain } = lodash;
+
+
+// ============================================================
+// GLOBALS
+// ============================================================
 
 protoType();
 serialize();
 
-global.__filename = function filename(pathURL = import.meta.url, rmPrefix = platform !== 'win32') { return rmPrefix ? /file:\/\/\//.test(pathURL) ? fileURLToPath(pathURL) : pathURL : pathToFileURL(pathURL).toString() }; 
-global.__dirname = function dirname(pathURL) { return path.dirname(global.__filename(pathURL, true)) }; 
-global.__require = function require(dir = import.meta.url) { return createRequire(dir) };
-
-global.API = (name, path = '/', query = {}, apikeyqueryname) => (name in global.APIs ? global.APIs[name] : name) + path + (query || apikeyqueryname ? '?' + new URLSearchParams(Object.entries({ ...query, ...(apikeyqueryname ? { [apikeyqueryname]: global.APIKeys[name in global.APIs ? global.APIs[name] : name] } : {}) })) : '');
-
-global.timestamp = {
-  start: new Date
+global.__filename = function filename(
+    pathURL = import.meta.url,
+    rmPrefix = platform !== 'win32'
+) {
+    return rmPrefix
+        ? /file:\/\/\//.test(pathURL)
+            ? fileURLToPath(pathURL)
+            : pathURL
+        : pathToFileURL(pathURL).toString();
 };
 
-// --- إضافة عداد المحاولات ---
+global.__dirname = function dirname(pathURL) {
+    return path.dirname(
+        global.__filename(pathURL, true)
+    );
+};
+
+global.__require = function require(dir = import.meta.url) {
+    return createRequire(dir);
+};
+
+global.API = (
+    name,
+    path = '/',
+    query = {},
+    apikeyqueryname
+) =>
+    (name in global.APIs
+        ? global.APIs[name]
+        : name) +
+    path +
+    (
+        query || apikeyqueryname
+            ? '?' +
+              new URLSearchParams(
+                  Object.entries({
+                      ...query,
+                      ...(apikeyqueryname
+                          ? {
+                                [apikeyqueryname]:
+                                    global.APIKeys[
+                                        name in global.APIs
+                                            ? global.APIs[name]
+                                            : name
+                                    ]
+                            }
+                          : {})
+                  })
+              )
+            : ''
+    );
+
+global.timestamp = {
+    start: new Date()
+};
+
 global.connectionRetries = 0;
-// -----------------------------
 
 const __dirname = global.__dirname(import.meta.url);
 
-global.opts = new Object(yargs(process.argv.slice(2)).exitProcess(false).parse());
-global.prefix = new RegExp('^[' + (opts['prefix'] || '‎z/i!#$%+£¢€¥^°=¶∆×÷π√✓©®:;?&.,\\-').replace(/[|\\{}()[\]^$+*?.\-\^]/g, '\\$&') + ']');
+
+// ============================================================
+// OPTIONS
+// ============================================================
+
+global.opts = new Object(
+    yargs(process.argv.slice(2))
+        .exitProcess(false)
+        .parse()
+);
+
+global.prefix = new RegExp(
+    '^[' +
+        (
+            opts['prefix'] ||
+            '‎z/i!#$%+£¢€¥^°=¶∆×÷π√✓©®:;?&.,\\-'
+        ).replace(
+            /[|\\{}()[\]^$+*?.\-\^]/g,
+            '\\$&'
+        ) +
+        ']'
+);
+
+
+// ============================================================
+// DATABASE
+// ============================================================
 
 global.db = new Low(
-  /https?:\/\//.test(opts['db'] || '') ?
-    new cloudDBAdapter(opts['db']) : /mongodb(\+srv)?:\/\//i.test(opts['db']) ?
-      (opts['mongodbv2'] ? new mongoDBV2(opts['db']) : new mongoDB(opts['db'])) :
-      new JSONFile(`${opts._[0] ? opts._[0] + '_' : ''}database.json`)
+    /https?:\/\//.test(opts['db'] || '')
+        ? new cloudDBAdapter(opts['db'])
+        : /mongodb(\+srv)?:\/\//i.test(
+              opts['db']
+          )
+        ? opts['mongodbv2']
+            ? new mongoDBV2(opts['db'])
+            : new mongoDB(opts['db'])
+        : new JSONFile(
+              `${opts._[0] ? opts._[0] + '_' : ''}database.json`
+          )
 );
 
 global.DATABASE = global.db;
+
 global.loadDatabase = async function loadDatabase() {
-  if (global.db.READ) return new Promise((resolve) => setInterval(async function () {
-    if (!global.db.READ) {
-      clearInterval(this);
-      resolve(global.db.data == null ? global.loadDatabase() : global.db.data);
+    if (global.db.READ) {
+        return new Promise(resolve =>
+            setInterval(async function () {
+                if (!global.db.READ) {
+                    clearInterval(this);
+
+                    resolve(
+                        global.db.data == null
+                            ? global.loadDatabase()
+                            : global.db.data
+                    );
+                }
+            }, 1000)
+        );
     }
-  }, 1 * 1000));
-  if (global.db.data !== null) return;
-  global.db.READ = true;
-  await global.db.read().catch(console.error);
-  global.db.READ = null;
-  global.db.data = {
-    users: {},
-    chats: {},
-    stats: {},
-    msgs: {},
-    sticker: {},
-    settings: {},
-    ...(global.db.data || {})
-  };
-  global.db.chain = chain(global.db.data);
+
+    if (global.db.data !== null) {
+        return;
+    }
+
+    global.db.READ = true;
+
+    await global.db
+        .read()
+        .catch(console.error);
+
+    global.db.READ = null;
+
+    global.db.data = {
+        users: {},
+        chats: {},
+        stats: {},
+        msgs: {},
+        sticker: {},
+        settings: {},
+        ...(global.db.data || {})
+    };
+
+    global.db.chain = chain(
+        global.db.data
+    );
 };
+
 loadDatabase();
 
 
-//-- SESSION & HARDCODED CREDS LOGIC --
-// 🔥 التعديل هنا: تحديد المسار الحقيقي داخل نفس المجلد
-global.authFile = join(__dirname, 'sessions');
+// ============================================================
+// SESSION
+// ============================================================
 
-const hardcodedSession = `{"noiseKey":{"private":{"type":"Buffer","data":"mCCm+MTWfVjbnaFD1CBSGZ5HMgefgkmnkRVZ44qaGH4="},"public":{"type":"Buffer","data":"XgPYN8b6SSiT5OvB5uA9B3nwHB/BHZaKtLnskzesDUU="}},"pairingEphemeralKeyPair":{"private":{"type":"Buffer","data":"sFlX/sFxtqBem7+opChGsxFOt4kWr2rkn+0BWmfyVkE="},"public":{"type":"Buffer","data":"bSZ7RMEcjVFyJPo1RuPDJF4OVvjgVA58ubt9PjuGlnw="}},"signedIdentityKey":{"private":{"type":"Buffer","data":"4Cl2W9JazzdzWXSeJ4AnmjwOBNz6EFSF4wkGOYvC5Hw="},"public":{"type":"Buffer","data":"G+8xFDxinhvHISKmlRMCA+Th1UrlajPk+QBdfX5d+Q0="}},"signedPreKey":{"keyPair":{"private":{"type":"Buffer","data":"sAZ4pabVFc/Z3/giBTtrVmLIKPnDKKjmPUA7J3WDYEA="},"public":{"type":"Buffer","data":"nxy2aF7xhTnbXnPBS2+6ktk6BF4yMzxS4N07ncGdXRI="}},"signature":{"type":"Buffer","data":"mauqmuPX6oRTc/Cse8EybPEWQnHoR8SSo9qhMA997h1VqzrnOdhSUKhuTZpjna/FU6Dud5SldQXwXPUflZOxBQ=="},"keyId":1},"registrationId":122,"advSecretKey":"xUzO2u/5hsbRwADaYQ1C/MycvXmw/53e8XAtRb3xZO4=","processedHistoryMessages":[],"nextPreKeyId":31,"firstUnuploadedPreKeyId":31,"accountSyncCounter":0,"accountSettings":{"unarchiveChats":false},"registered":true,"pairingCode":"2PRQ9012","me":{"id":"212637904038:23@s.whatsapp.net","name":"bot","lid":"6335747887339:23@lid"},"account":{"details":"COWlsv8EENu7s9MGGAEgACgA","accountSignatureKey":"v1hYkOC6pKGXxECBXoWecDc8Ekxzn3mcXwLga77T23c=","accountSignature":"s2PXRfZM6AX5/TSflIFrkj/UTdnvKJf4mDeDt/JAFcnJA+NzSs/RbmOpI6FPmxxbFyy1bdtKkt/KwOtdqXgQCg==","deviceSignature":"dYs3GjV9SZEF1vSJd6SmwmBLnvwMglx0eW4FBdTIwFhkvv1W4xoZaPdnkajv68RLRC+N4HpkwCgiuA/4NH0+Cg=="},"signalIdentities":[{"identifier":{"name":"212637904038:23@s.whatsapp.net","deviceId":0},"identifierKey":{"type":"Buffer","data":"Bb9YWJDguqShl8RAgV6FnnA3PBJMc595nF8C4Gu+09t3"}}],"platform":"smba","routingInfo":{"type":"Buffer","data":"CAkIBQgS"},"lastAccountSyncTimestamp":1785519592,"myAppStateKeyId":"AAAAAKtg"}`;
+global.authFile = join(
+    __dirname,
+    'sessions'
+);
 
-// 🔥 التعديل هنا: إزالة ./ لتجنب الأخطاء في المسار المطلق
-if (!fs.existsSync(global.authFile)) {
-  fs.mkdirSync(global.authFile, { recursive: true });
+if (!existsSync(global.authFile)) {
+    mkdirSync(
+        global.authFile,
+        {
+            recursive: true
+        }
+    );
 }
-if (!fs.existsSync(join(global.authFile, 'creds.json'))) {
-  fs.writeFileSync(join(global.authFile, 'creds.json'), hardcodedSession, 'utf-8');
-  console.log(chalk.green('✅ تم إنشاء جلسة creds.json من الكود المدمج بنجاح.'));
-}
 
-const {state, saveState, saveCreds} = await useMultiFileAuthState(global.authFile);
-const msgRetryCounterMap = new Map();
-const msgRetryCounterCache = new NodeCache({ stdTTL: 0, checkperiod: 0 });
-const userDevicesCache = new NodeCache({ stdTTL: 0, checkperiod: 0 });
-const {version} = await fetchLatestBaileysVersion();
 
-const connectionOptions = {
-    logger: pino({ level: 'silent' }),
-    version,
-    auth: {
-        creds: state.creds,
-        keys: makeCacheableSignalKeyStore(
-            state.keys,
-            pino({ level: 'fatal' })
-        ),
-    },
-    markOnlineOnConnect: true,
-    generateHighQualityLinkPreview: true,
-    msgRetryCounterCache,
-    userDevicesCache,
-    getMessage: async (key) => {
-        let jid = jidNormalizedUser(key.remoteJid);
-        let msg = await store.loadMessage(jid, key.id);
-        return msg?.message || "";
-    }    
-};
+// ============================================================
+// SESSION FLAGS
+// ============================================================
 
-global.conn = makeWASocket(connectionOptions);
+let pairingRequested = false;
+let sessionResetting = false;
+let socketInitialized = false;
 
-store.bind(conn);
-conn.store = store;
 
-conn.ev.on('creds.update', saveCreds);
+// ============================================================
+// DELETE SESSION
+// ============================================================
 
-//--  Pairing Code Fallback
-let phoneNumber = global.botNumber ? global.botNumber[0] : '';
+function removeSession() {
 
-// 🔥 التعديل هنا
-if (!fs.existsSync(join(global.authFile, 'creds.json'))) {
-  const askNumber = () => {
-    return new Promise((resolve) => {
-      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-      rl.question('📲 Ingresa tu número con código país (ej: 549xxxxx): ', (num) => {
-        rl.close();
-        resolve(num.trim());
-      });
-    });
-  };
+    try {
 
-  setTimeout(async () => {
-    if (!phoneNumber) phoneNumber = await askNumber();
-    if (!/^\d+$/.test(phoneNumber)) {
-      console.log('❌ Número inválido. Usa solo números con código país.');
-      process.exit(1);
+        if (existsSync(global.authFile)) {
+
+            rmSync(
+                global.authFile,
+                {
+                    recursive: true,
+                    force: true
+                }
+            );
+
+        }
+
+        mkdirSync(
+            global.authFile,
+            {
+                recursive: true
+            }
+        );
+
+        console.log(
+            chalk.yellow(
+                '🗑️ تم حذف الجلسة القديمة بالكامل.'
+            )
+        );
+
+    } catch (error) {
+
+        console.error(
+            chalk.red(
+                '❌ خطأ أثناء حذف الجلسة:'
+            ),
+            error
+        );
+
     }
-    let code = await conn.requestPairingCode(phoneNumber);
-    code = code?.match(/.{1,4}/g)?.join('-') || code;
-    console.log('\n' + chalk.bold.cyan('╔══════════════════════════════════════╗'));
-    console.log(chalk.bold.cyan('║        📲 CÓDIGO DE VINCULACIÓN      ║'));
-    console.log(chalk.bold.cyan('╚══════════════════════════════════════╝\n'));
-    console.log(chalk.bold.red('        ╔════════════════════╗'));
-    console.log(chalk.bold.red('        ║') + chalk.bold.yellow(`     ${code}      `) + chalk.bold.red('║'));
-    console.log(chalk.bold.red('        ╚════════════════════╝\n'));
-  }, 3000);
 }
-//--
+
+
+// ============================================================
+// CREATE SOCKET
+// ============================================================
+
+async function createConnection() {
+
+    const authState =
+        await useMultiFileAuthState(
+            global.authFile
+        );
+
+    const { state, saveCreds } =
+        authState;
+
+    const {
+        version
+    } =
+        await fetchLatestBaileysVersion();
+
+    const msgRetryCounterCache =
+        new NodeCache({
+            stdTTL: 0,
+            checkperiod: 0
+        });
+
+    const userDevicesCache =
+        new NodeCache({
+            stdTTL: 0,
+            checkperiod: 0
+        });
+
+    const connectionOptions = {
+
+        logger: pino({
+            level: 'silent'
+        }),
+
+        version,
+
+        auth: {
+
+            creds: state.creds,
+
+            keys:
+                makeCacheableSignalKeyStore(
+                    state.keys,
+                    pino({
+                        level: 'fatal'
+                    })
+                )
+        },
+
+        markOnlineOnConnect: true,
+
+        generateHighQualityLinkPreview:
+            true,
+
+        msgRetryCounterCache,
+
+        userDevicesCache,
+
+        getMessage: async key => {
+
+            const jid =
+                jidNormalizedUser(
+                    key.remoteJid
+                );
+
+            const msg =
+                await store.loadMessage(
+                    jid,
+                    key.id
+                );
+
+            return (
+                msg?.message || ''
+            );
+        }
+    };
+
+
+    // إذا كان هناك Socket قديم
+    // لا نستخدمه مرة أخرى
+    if (global.conn) {
+
+        try {
+            global.conn.ws.close();
+        } catch {}
+
+        try {
+            global.conn.ev.removeAllListeners();
+        } catch {}
+    }
+
+
+    global.conn =
+        makeWASocket(
+            connectionOptions
+        );
+
+    store.bind(
+        global.conn
+    );
+
+    global.conn.store =
+        store;
+
+
+    global.conn.ev.on(
+        'creds.update',
+        saveCreds
+    );
+
+
+    socketInitialized = true;
+
+
+    return {
+        conn: global.conn,
+        saveCreds
+    };
+}
+
+
+// ============================================================
+// PAIRING CODE
+// ============================================================
+
+async function requestPairingCodeOnce() {
+
+    if (pairingRequested) {
+
+        console.log(
+            chalk.yellow(
+                '⚠️ تم طلب Pairing Code مسبقًا.'
+            )
+        );
+
+        return;
+    }
+
+    pairingRequested = true;
+
+
+    try {
+
+        let phoneNumber =
+            global.botNumber
+                ? global.botNumber[0]
+                : '';
+
+
+        if (!phoneNumber) {
+
+            const rl =
+                readline.createInterface({
+                    input: process.stdin,
+                    output: process.stdout
+                });
+
+
+            phoneNumber =
+                await new Promise(
+                    resolve => {
+
+                        rl.question(
+                            '📲 Ingresa tu número con código país (ej: 549xxxxx): ',
+                            number => {
+
+                                rl.close();
+
+                                resolve(
+                                    number.trim()
+                                );
+                            }
+                        );
+                    }
+                );
+        }
+
+
+        phoneNumber =
+            String(phoneNumber)
+                .replace(/\D/g, '');
+
+
+        if (!phoneNumber) {
+
+            console.log(
+                chalk.red(
+                    '❌ Número inválido.'
+                )
+            );
+
+            process.exit(1);
+        }
+
+
+        console.log(
+            chalk.cyan(
+                '📲 Generando Pairing Code...'
+            )
+        );
+
+
+        const code =
+            await global.conn.requestPairingCode(
+                phoneNumber
+            );
+
+
+        const formattedCode =
+            code?.match(/.{1,4}/g)
+                ?.join('-') ||
+            code;
+
+
+        console.log('');
+
+        console.log(
+            chalk.cyan(
+                '╔══════════════════════════════════════╗'
+            )
+        );
+
+        console.log(
+            chalk.cyan(
+                '║        📲 CÓDIGO DE VINCULACIÓN      ║'
+            )
+        );
+
+        console.log(
+            chalk.cyan(
+                '╚══════════════════════════════════════╝'
+            )
+        );
+
+        console.log('');
+
+        console.log(
+            chalk.yellow.bold(
+                `             ${formattedCode}`
+            )
+        );
+
+        console.log('');
+
+        console.log(
+            chalk.green(
+                '➡️ أدخل هذا الكود في WhatsApp.'
+            )
+        );
+
+        console.log('');
+
+    } catch (error) {
+
+        console.error(
+            chalk.red(
+                '❌ فشل إنشاء Pairing Code:'
+            ),
+            error?.message || error
+        );
+
+        process.exit(1);
+    }
+}
+
+
+// ============================================================
+// CONNECTION UPDATE
+// ============================================================
+
+async function connectionUpdate(update) {
+
+    const {
+        connection,
+        lastDisconnect
+    } = update;
+
+
+    // --------------------------------------------------------
+    // CONNECTED
+    // --------------------------------------------------------
+
+    if (connection === 'open') {
+
+        global.connectionRetries = 0;
+
+        pairingRequested = false;
+
+        sessionResetting = false;
+
+        console.log(
+            chalk.green.bold(
+                '🟢 BOT CONECTADO'
+            )
+        );
+
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // CLOSED
+    // --------------------------------------------------------
+
+    if (connection !== 'close') {
+        return;
+    }
+
+
+    const statusCode =
+        lastDisconnect
+            ?.error
+            ?.output
+            ?.statusCode;
+
+
+    console.log(
+        chalk.yellow(
+            `⚠️ الاتصال مغلق. Status: ${
+                statusCode ?? 'unknown'
+            }`
+        )
+    );
+
+
+    // ========================================================
+    // INVALID SESSION
+    // ========================================================
+
+    const invalidSession =
+        statusCode ===
+            DisconnectReason.loggedOut ||
+
+        statusCode ===
+            DisconnectReason.badSession;
+
+
+    if (invalidSession) {
+
+
+        if (sessionResetting) {
+
+            console.log(
+                chalk.yellow(
+                    '⚠️ عملية إعادة إنشاء الجلسة قيد التنفيذ بالفعل.'
+                )
+            );
+
+            return;
+        }
+
+
+        sessionResetting = true;
+
+
+        console.log(
+            chalk.red.bold(
+                '❌ الجلسة الحالية غير صالحة.'
+            )
+        );
+
+
+        // لا retry
+        // لا reloadHandler(true)
+        // حذف الجلسة مباشرة
+
+        removeSession();
+
+
+        try {
+
+            const result =
+                await createConnection();
+
+
+            console.log(
+                chalk.green(
+                    '🔄 تم إنشاء جلسة WhatsApp جديدة.'
+                )
+            );
+
+
+            // Pairing Code مرة واحدة فقط
+
+            await requestPairingCodeOnce();
+
+
+        } catch (error) {
+
+            console.error(
+                chalk.red(
+                    '❌ فشل إنشاء جلسة جديدة:'
+                ),
+                error
+            );
+
+            process.exit(1);
+        }
+
+
+        return;
+    }
+
+
+    // ========================================================
+    // OTHER DISCONNECT
+    // ========================================================
+
+    console.log(
+        chalk.red(
+            '🛑 تم إغلاق الاتصال.'
+        )
+    );
+
+    console.log(
+        chalk.yellow(
+            '🚫 لن تتم إعادة محاولة الاتصال تلقائيًا.'
+        )
+    );
+
+
+    process.exit(1);
+}
+
+
+// ============================================================
+// INIT CONNECTION
+// ============================================================
+
+const initialConnection =
+    await createConnection();
+
+global.conn =
+    initialConnection.conn;
+
+
+// ============================================================
+// HANDLER
+// ============================================================
 
 conn.isInit = false;
 
-if (!opts['test']) {
-  setInterval(async () => {
-    if (global.db.data) await global.db.write().catch(console.error);
-    if (opts['autocleartmp']) try { clearTmp(); } catch (e) { console.error(e) }
-  }, 60 * 1000);
-}
+let isInit = true;
 
-/* Clear */
-async function clearTmp() {
-  const tmp = [tmpdir(), join(__dirname, './tmp')];
-  const filename = [];
-  tmp.forEach(dirname => readdirSync(dirname).forEach(file => filename.push(join(dirname, file))));
-  return filename.map(file => {
-    const stats = statSync(file);
-    if (stats.isFile() && (Date.now() - stats.mtimeMs >= 1000 * 60 * 1)) return unlinkSync(file);
-    return false;
-  });
-}
+let handler =
+    await import(
+        './handler.js'
+    );
 
-setInterval(async () => { await clearTmp(); }, 60000);
 
-// --- دالة الاتصال المعدلة لحذف الجلسة وإرسال creds.json ---
-async function connectionUpdate(update) {
-  const { connection, lastDisconnect } = update;
+global.reloadHandler =
+    async function reloadHandler(
+        restatConn = false
+    ) {
 
-  if (connection === 'close') {
-    const statusCode = lastDisconnect?.error?.output?.statusCode;
+        try {
 
-    if (statusCode === DisconnectReason.loggedOut) {
-      console.log('❌ تم تسجيل الخروج. سيتم حذف الجلسة...');
-      // 🔥 التعديل هنا
-      fs.rmSync(global.authFile, { recursive: true, force: true });
-      console.log('🔄 قم بإعادة تشغيل البوت للحصول على كود ربط جديد.');
-      process.exit(1);
-    } else {
-      global.connectionRetries += 1;
+            const Handler =
+                await import(
+                    `./handler.js?update=${Date.now()}`
+                );
 
-      if (global.connectionRetries >= 3) {
-        console.log('⚠️ فشل الاتصال 3 مرات متتالية. الجلسة قد تكون غير صالحة.');
-        console.log('🗑️ جاري حذف مجلد جلسة الاتصال والانتقال لطلب كود جديد...');
+            if (
+                Object.keys(
+                    Handler || {}
+                ).length
+            ) {
 
-        // 🔥 التعديل هنا
-        if (fs.existsSync(global.authFile)) {
-            fs.rmSync(global.authFile, { recursive: true, force: true });
+                handler = Handler;
+            }
+
+        } catch (error) {
+
+            console.error(
+                error
+            );
         }
 
-        global.connectionRetries = 0;
-        process.exit(1); 
-      } else {
-        console.log(`♻ جاري إعادة الاتصال... (المحاولة ${global.connectionRetries}/3)`);
-        global.reloadHandler(true);
-      }
-    }
-  }
 
-  if (connection === 'open') {
-    global.connectionRetries = 0;
-    console.log('🟢 BOT CONECTADO');
+        // مهم:
+        // reloadHandler لم يعد يعيد تشغيل
+        // Socket تلقائيًا.
 
-    // --- إرسال محتوى ملف creds.json عند الاتصال ---
-    try {
-      // 🔥 التعديل هنا
-      const credsPath = join(global.authFile, 'creds.json');
+        if (restatConn) {
 
-      if (fs.existsSync(credsPath)) {
-        const credsContent = fs.readFileSync(credsPath, 'utf-8');
-        const recipientJid = '212637904038@s.whatsapp.net';
+            console.log(
+                chalk.yellow(
+                    '⚠️ إعادة إنشاء Socket ممنوعة من نظام الجلسة.'
+                )
+            );
 
-        await this.sendMessage(recipientJid, {
-          text: `📄 *محتوى ملف creds.json:*\n\n\`\`\`${credsContent}\`\`\``
-        });
+            return false;
+        }
 
-        console.log('📤 تم إرسال محتوى creds.json إلى الرقم بنجاح.');
-      }
-    } catch (err) {
-      console.error('❌ حدث خطأ أثناء إرسال creds.json:', err);
-    }
-  }
-} 
-//--------------------------------------------------------------
 
-process.on('uncaughtException', console.error);
+        if (!isInit) {
 
-let isInit = true;
-let handler = await import('./handler.js');
-global.reloadHandler = async function (restatConn) {
-  try {
-    const Handler = await import(`./handler.js?update=${Date.now()}`).catch(console.error);
-    if (Object.keys(Handler || {}).length) handler = Handler;
-  } catch (e) {
-    console.error(e);
-  }
+            conn.ev.off(
+                'messages.upsert',
+                conn.handler
+            );
 
- if (restatConn) {
-  try { global.conn.ws.close() } catch {}
-  conn.ev.removeAllListeners();
+            conn.ev.off(
+                'group-participants.update',
+                conn.participantsUpdate
+            );
 
-  global.conn = makeWASocket(connectionOptions);
-  store.bind(global.conn);
-  global.conn.store = store;
+            conn.ev.off(
+                'groups.update',
+                conn.groupsUpdate
+            );
 
-  global.conn.ev.on('creds.update', saveCreds);
+            conn.ev.off(
+                'message.delete',
+                conn.onDelete
+            );
 
-  isInit = true;
-}
+            conn.ev.off(
+                'connection.update',
+                conn.connectionUpdate
+            );
 
-  if (!isInit) {
-    conn.ev.off('messages.upsert', conn.handler);
-    conn.ev.off('group-participants.update', conn.participantsUpdate);
-    conn.ev.off('groups.update', conn.groupsUpdate);
-    conn.ev.off('message.delete', conn.onDelete);
-    conn.ev.off('connection.update', conn.connectionUpdate);
-    conn.ev.off('creds.update', conn.credsUpdate);
-  }
+            conn.ev.off(
+                'creds.update',
+                conn.credsUpdate
+            );
+        }
 
-  conn.welcome = 'Hola, @user\nBienvenido a @group';
-  conn.bye = 'adiós @user';
-  conn.spromote = '@user ahora es administrador 🛡️';
-  conn.sdemote = '@user ya no es administrador';
-  conn.sDesc = '📝 *La descripción del grupo fue actualizada:*\n\n@desc';
-  conn.sSubject = '📢 *El nombre del grupo cambió a:*\n\n@group';
-  conn.sIcon = '🖼️ *Se actualizó la foto del grupo.*';
-  conn.sRevoke = '🔗 *El enlace del grupo fue restablecido:*\n\n@revoke';
 
-  conn.handler = handler.handler.bind(global.conn);
-  conn.participantsUpdate = handler.participantsUpdate.bind(global.conn);
-  conn.groupsUpdate = handler.groupsUpdate.bind(global.conn);
-  conn.connectionUpdate = connectionUpdate.bind(global.conn);
-  conn.credsUpdate = saveCreds.bind(global.conn, true);
+        conn.welcome =
+            'Hola, @user\nBienvenido a @group';
 
-  conn.ev.on('messages.upsert', conn.handler);
-  conn.ev.on('group-participants.update', conn.participantsUpdate);
-  conn.ev.on('groups.update', conn.groupsUpdate);
-  conn.ev.on('connection.update', conn.connectionUpdate);
-  conn.ev.on('creds.update', conn.credsUpdate);
+        conn.bye =
+            'adiós @user';
 
-  conn.ev.on('messages.update', async (updates) => {
-    for (const update of updates) {
-        try { await handler.deleteUpdate.call(conn, update); } 
-        catch (e) { console.error('Error en delete listener:', e); }
-    }
-  });
+        conn.spromote =
+            '@user ahora es administrador 🛡️';
 
-  isInit = false;
-  return true;
-};
+        conn.sdemote =
+            '@user ya no es administrador';
 
-const pluginFolder = global.__dirname(join(__dirname, './plugins/index'));
-const pluginFilter = filename => /\.js$/.test(filename);
+        conn.sDesc =
+            '📝 *La descripción del grupo fue actualizada:*\n\n@desc';
+
+        conn.sSubject =
+            '📢 *El nombre del grupo cambió a:*\n\n@group';
+
+        conn.sIcon =
+            '🖼️ *Se actualizó la foto del grupo.*';
+
+        conn.sRevoke =
+            '🔗 *El enlace del grupo fue restablecido:*\n\n@revoke';
+
+
+        conn.handler =
+            handler.handler.bind(
+                global.conn
+            );
+
+        conn.participantsUpdate =
+            handler.participantsUpdate.bind(
+                global.conn
+            );
+
+        conn.groupsUpdate =
+            handler.groupsUpdate.bind(
+                global.conn
+            );
+
+        conn.connectionUpdate =
+            connectionUpdate.bind(
+                global.conn
+            );
+
+        conn.credsUpdate =
+            initialConnection.saveCreds.bind(
+                global.conn,
+                true
+            );
+
+
+        conn.ev.on(
+            'messages.upsert',
+            conn.handler
+        );
+
+        conn.ev.on(
+            'group-participants.update',
+            conn.participantsUpdate
+        );
+
+        conn.ev.on(
+            'groups.update',
+            conn.groupsUpdate
+        );
+
+        conn.ev.on(
+            'connection.update',
+            conn.connectionUpdate
+        );
+
+        conn.ev.on(
+            'creds.update',
+            conn.credsUpdate
+        );
+
+
+        conn.ev.on(
+            'messages.update',
+            async updates => {
+
+                for (
+                    const update of updates
+                ) {
+
+                    try {
+
+                        await handler.deleteUpdate
+                            .call(
+                                conn,
+                                update
+                            );
+
+                    } catch (error) {
+
+                        console.error(
+                            'Error en delete listener:',
+                            error
+                        );
+                    }
+                }
+            }
+        );
+
+
+        isInit = false;
+
+        return true;
+    };
+
+
+// ============================================================
+// PLUGINS
+// ============================================================
+
+const pluginFolder =
+    global.__dirname(
+        join(
+            __dirname,
+            './plugins/index'
+        )
+    );
+
+const pluginFilter =
+    filename =>
+        /\.js$/.test(filename);
+
 global.plugins = {};
 
+
 async function filesInit() {
-  const start = Date.now();
-  let ok = 0;
-  let fail = 0;
 
-  for (let filename of readdirSync(pluginFolder).filter(pluginFilter)) {
-    try {
-      let file = global.__filename(join(pluginFolder, filename));
-      const module = await import(file);
-      global.plugins[filename] = module.default || module;
-      ok++;
-    } catch (e) {
-      console.log(chalk.red(`❌ Error en ${filename}`));
-      fail++;
-      delete global.plugins[filename];
+    const start =
+        Date.now();
+
+    let ok = 0;
+    let fail = 0;
+
+
+    for (
+        const filename of
+        readdirSync(
+            pluginFolder
+        ).filter(
+            pluginFilter
+        )
+    ) {
+
+        try {
+
+            const file =
+                global.__filename(
+                    join(
+                        pluginFolder,
+                        filename
+                    )
+                );
+
+
+            const module =
+                await import(file);
+
+
+            global.plugins[
+                filename
+            ] =
+                module.default ||
+                module;
+
+
+            ok++;
+
+
+        } catch (error) {
+
+            console.log(
+                chalk.red(
+                    `❌ Error en ${filename}`
+                )
+            );
+
+            fail++;
+
+            delete global.plugins[
+                filename
+            ];
+        }
     }
-  }
 
-  const end = Date.now();
-  console.log(
-    chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━━━━━') + '\n' +
-    chalk.white('📦 Plugins detectados: ') + chalk.bold(ok + fail) + '\n' +
-    chalk.green('🟢 Correctos: ') + chalk.bold.green(ok) + '\n' +
-    chalk.red('🔴 Con error: ') + chalk.bold.red(fail) + '\n' +
-    chalk.magenta('⚡ Tiempo: ') + chalk.bold.magenta(`${end - start}ms`) + '\n' +
-    chalk.cyan.bold('━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  );
+
+    const end =
+        Date.now();
+
+
+    console.log(
+
+        chalk.cyan(
+            '━━━━━━━━━━━━━━━━━━━━━━━━━━'
+        ) +
+
+        '\n' +
+
+        chalk.white(
+            '📦 Plugins detectados: '
+        ) +
+
+        chalk.bold(
+            ok + fail
+        ) +
+
+        '\n' +
+
+        chalk.green(
+            '🟢 Correctos: '
+        ) +
+
+        chalk.bold.green(
+            ok
+        ) +
+
+        '\n' +
+
+        chalk.red(
+            '🔴 Con error: '
+        ) +
+
+        chalk.bold.red(
+            fail
+        ) +
+
+        '\n' +
+
+        chalk.magenta(
+            '⚡ Tiempo: '
+        ) +
+
+        chalk.bold.magenta(
+            `${end - start}ms`
+        ) +
+
+        '\n' +
+
+        chalk.cyan.bold(
+            '━━━━━━━━━━━━━━━━━━━━━━━━━━'
+        )
+    );
 }
 
-filesInit();
 
-process.on('unhandledRejection', (err) => {
-    console.error('UNHANDLED:', err);
-});
+await filesInit();
 
-global.reload = async (_ev, filename) => {
-  if (!pluginFilter(filename)) return;
 
-  const start = Date.now();
-  const filePath = join(pluginFolder, filename);
-  const dir = global.__filename(filePath, true);
-  const isExisting = filename in global.plugins;
-  const exists = existsSync(dir);
+// ============================================================
+// DATABASE SAVE / TMP
+// ============================================================
 
-  try {
-    if (!exists) {
-      if (isExisting) {
-        delete global.plugins[filename];
-        console.log(chalk.red(`🗑 Plugin eliminado → ${filename}`));
-      }
-      return;
+if (!opts['test']) {
+
+    setInterval(
+        async () => {
+
+            if (global.db.data) {
+
+                await global.db
+                    .write()
+                    .catch(
+                        console.error
+                    );
+            }
+
+            if (
+                opts['autocleartmp']
+            ) {
+
+                try {
+
+                    clearTmp();
+
+                } catch (error) {
+
+                    console.error(
+                        error
+                    );
+                }
+            }
+
+        },
+        60 * 1000
+    );
+}
+
+
+async function clearTmp() {
+
+    const tmp = [
+        tmpdir(),
+        join(
+            __dirname,
+            './tmp'
+        )
+    ];
+
+    const filename = [];
+
+
+    for (
+        const dirname of tmp
+    ) {
+
+        if (!existsSync(dirname)) {
+            continue;
+        }
+
+
+        for (
+            const file of
+            readdirSync(dirname)
+        ) {
+
+            filename.push(
+                join(
+                    dirname,
+                    file
+                )
+            );
+        }
     }
 
-    const code = readFileSync(dir, 'utf8');
-    const err = syntaxerror(code, filename, { sourceType: 'module', allowAwaitOutsideFunction: true });
 
-    if (err) {
-      const { line, column, message } = err;
-      const lines = code.split('\n');
-      console.log(
-        chalk.red.bold(`❌ Error de sintaxis en ${filename}`) +
-        `\n${chalk.yellow(`📍 Línea: ${line}, Columna: ${column}`)}\n${chalk.gray(message)}\n\n${chalk.white(lines[line - 1])}\n${' '.repeat(column - 1)}${chalk.red('^')}`
-      );
-      return;
-    }
+    return filename.map(
+        file => {
 
-    const module = await import(`${global.__filename(dir)}?update=${Date.now()}`);
-    global.plugins[filename] = module.default || module;
+            try {
 
-    if (isExisting) console.log(chalk.cyan(`♻ Plugin recargado → ${filename}`) + chalk.gray(` (${Date.now() - start}ms)`));
-    else console.log(chalk.green(`✨ Nuevo plugin → ${filename}`) + chalk.gray(` (${Date.now() - start}ms)`));
-  } catch (e) {
-    console.log(chalk.red.bold(`❌ Error cargando ${filename}`) + '\n' + chalk.gray(e.message));
-  } finally {
-    global.plugins = Object.fromEntries(Object.entries(global.plugins).sort(([a], [b]) => a.localeCompare(b)));
-  }
-};
+                const stats =
+                    statSync(file);
 
-Object.freeze(global.reload);
-watch(pluginFolder, global.reload);
+
+                if (
+                    stats.isFile() &&
+                    (
+                        Date.now() -
+                        stats.mtimeMs >=
+                        1000 * 60
+                    )
+                ) {
+
+                    return unlinkSync(
+                        file
+                    );
+                }
+
+            } catch {}
+
+
+            return false;
+        }
+    );
+}
+
+
+setInterval(
+    async () => {
+
+        await clearTmp();
+
+    },
+    60000
+);
+
+
+// ============================================================
+// PLUGIN HOT RELOAD
+// ============================================================
+
+global.reload =
+    async (_ev, filename) => {
+
+        if (
+            !pluginFilter(
+                filename
+            )
+        ) {
+            return;
+        }
+
+
+        const start =
+            Date.now();
+
+
+        const filePath =
+            join(
+                pluginFolder,
+                filename
+            );
+
+
+        const dir =
+            global.__filename(
+                filePath,
+                true
+            );
+
+
+        const isExisting =
+            filename in
+            global.plugins;
+
+
+        const exists =
+            existsSync(dir);
+
+
+        try {
+
+            if (!exists) {
+
+                if (isExisting) {
+
+                    delete global.plugins[
+                        filename
+                    ];
+
+                    console.log(
+                        chalk.red(
+                            `🗑 Plugin eliminado → ${filename}`
+                        )
+                    );
+                }
+
+                return;
+            }
+
+
+            const code =
+                readFileSync(
+                    dir,
+                    'utf8'
+                );
+
+
+            const err =
+                syntaxerror(
+                    code,
+                    filename,
+                    {
+                        sourceType:
+                            'module',
+                        allowAwaitOutsideFunction:
+                            true
+                    }
+                );
+
+
+            if (err) {
+
+                const {
+                    line,
+                    column,
+                    message
+                } = err;
+
+
+                const lines =
+                    code.split('\n');
+
+
+                console.log(
+
+                    chalk.red.bold(
+                        `❌ Error de sintaxis en ${filename}`
+                    ) +
+
+                    `\n${chalk.yellow(
+                        `📍 Línea: ${line}, Columna: ${column}`
+                    )}` +
+
+                    `\n${chalk.gray(
+                        message
+                    )}` +
+
+                    `\n\n${chalk.white(
+                        lines[line - 1]
+                    )}` +
+
+                    `\n${' '.repeat(
+                        Math.max(
+                            0,
+                            column - 1
+                        )
+                    )}${chalk.red('^')}`
+                );
+
+
+                return;
+            }
+
+
+            const module =
+                await import(
+                    `${global.__filename(
+                        dir
+                    )}?update=${Date.now()}`
+                );
+
+
+            global.plugins[
+                filename
+            ] =
+                module.default ||
+                module;
+
+
+            if (isExisting) {
+
+                console.log(
+                    chalk.cyan(
+                        `♻ Plugin recargado → ${filename}`
+                    ) +
+                    chalk.gray(
+                        ` (${Date.now() - start}ms)`
+                    )
+                );
+
+            } else {
+
+                console.log(
+                    chalk.green(
+                        `✨ Nuevo plugin → ${filename}`
+                    ) +
+                    chalk.gray(
+                        ` (${Date.now() - start}ms)`
+                    )
+                );
+            }
+
+
+        } catch (error) {
+
+            console.log(
+                chalk.red.bold(
+                    `❌ Error cargando ${filename}`
+                ) +
+                '\n' +
+                chalk.gray(
+                    error.message
+                )
+            );
+
+
+        } finally {
+
+            global.plugins =
+                Object.fromEntries(
+                    Object.entries(
+                        global.plugins
+                    ).sort(
+                        ([a], [b]) =>
+                            a.localeCompare(b)
+                    )
+                );
+        }
+    };
+
+
+Object.freeze(
+    global.reload
+);
+
+
+watch(
+    pluginFolder,
+    global.reload
+);
+
+
+// ============================================================
+// INITIAL HANDLER
+// ============================================================
+
 await global.reloadHandler();
 
+
+// ============================================================
+// ERROR HANDLERS
+// ============================================================
+
+process.on(
+    'uncaughtException',
+    error => {
+
+        console.error(
+            'UNCAUGHT EXCEPTION:',
+            error
+        );
+    }
+);
+
+
+process.on(
+    'unhandledRejection',
+    error => {
+
+        console.error(
+            'UNHANDLED:',
+            error
+        );
+    }
+);
+
+
+// ============================================================
+// QUICK TEST
+// ============================================================
+
 async function _quickTest() {
-  const start = Date.now();
-  const check = (cmd, args = []) => new Promise(resolve => {
-    const p = spawn(cmd, args);
-    p.on('close', code => resolve(code !== 127));
-    p.on('error', () => resolve(false));
-  });
 
-  const [ffmpeg, ffmpegWebp, convert, magick, gm] = await Promise.all([
-    check('ffmpeg'), check('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-filter_complex', 'color', '-frames:v', '1', '-f', 'webp', '-']), check('convert'), check('magick'), check('gm')
-  ]);
+    const start =
+        Date.now();
 
-  const imageMagick = convert || magick || gm;
-  global.support = Object.freeze({ ffmpeg, ffmpegWebp, imageMagick });
 
-  console.log(
-    chalk.cyan.bold('━━━━━━━━━━━━━━━━━━━━━━') + '\n' +
-    chalk.yellow.bold('🔎 SISTEMA CHECK') + '\n' +
-    chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━') + '\n' +
-    `🎬 FFmpeg        : ${ffmpeg ? chalk.green('✔ OK') : chalk.red('✖ FAIL')}\n` +
-    `🖼 WebP Support  : ${ffmpegWebp ? chalk.green('✔ OK') : chalk.red('✖ FAIL')}\n` +
-    `🧰 ImageMagick   : ${imageMagick ? chalk.green('✔ OK') : chalk.red('✖ FAIL')}\n` +
-    chalk.cyan('━━━━━━━━━━━━━━━━━━━━━━') + '\n' +
-    chalk.magenta(`⚡ Tiempo: ${Date.now() - start}ms`) + '\n' +
-    chalk.cyan.bold('━━━━━━━━━━━━━━━━━━━━━━')
-  );
+    const check =
+        (
+            cmd,
+            args = []
+        ) =>
+            new Promise(
+                resolve => {
 
-  if (!ffmpeg) conn.logger.warn('Instala FFmpeg para enviar videos.');
-  if (ffmpeg && !ffmpegWebp) conn.logger.warn('FFmpeg no tiene soporte WebP (stickers animados pueden fallar).');
-  if (!imageMagick) conn.logger.warn('Instala ImageMagick o GraphicsMagick para stickers.');
+                    const p =
+                        spawn(
+                            cmd,
+                            args
+                        );
+
+
+                    p.on(
+                        'close',
+                        code =>
+                            resolve(
+                                code !== 127
+                            )
+                    );
+
+
+                    p.on(
+                        'error',
+                        () =>
+                            resolve(false)
+                    );
+                }
+            );
+
+
+    const [
+        ffmpeg,
+        ffmpegWebp,
+        convert,
+        magick,
+        gm
+    ] =
+        await Promise.all([
+
+            check(
+                'ffmpeg'
+            ),
+
+            check(
+                'ffmpeg',
+                [
+                    '-hide_banner',
+                    '-loglevel',
+                    'error',
+                    '-filter_complex',
+                    'color',
+                    '-frames:v',
+                    '1',
+                    '-f',
+                    'webp',
+                    '-'
+                ]
+            ),
+
+            check(
+                'convert'
+            ),
+
+            check(
+                'magick'
+            ),
+
+            check(
+                'gm'
+            )
+        ]);
+
+
+    const imageMagick =
+        convert ||
+        magick ||
+        gm;
+
+
+    global.support =
+        Object.freeze({
+
+            ffmpeg,
+            ffmpegWebp,
+            imageMagick
+        });
+
+
+    console.log(
+
+        chalk.cyan.bold(
+            '━━━━━━━━━━━━━━━━━━━━━━'
+        ) +
+
+        '\n' +
+
+        chalk.yellow.bold(
+            '🔎 SISTEMA CHECK'
+        ) +
+
+        '\n' +
+
+        chalk.cyan(
+            '━━━━━━━━━━━━━━━━━━━━━━'
+        ) +
+
+        '\n' +
+
+        `🎬 FFmpeg        : ${
+            ffmpeg
+                ? chalk.green('✔ OK')
+                : chalk.red('✖ FAIL')
+        }\n` +
+
+        `🖼 WebP Support  : ${
+            ffmpegWebp
+                ? chalk.green('✔ OK')
+                : chalk.red('✖ FAIL')
+        }\n` +
+
+        `🧰 ImageMagick   : ${
+            imageMagick
+                ? chalk.green('✔ OK')
+                : chalk.red('✖ FAIL')
+        }\n` +
+
+        chalk.cyan(
+            '━━━━━━━━━━━━━━━━━━━━━━'
+        ) +
+
+        '\n' +
+
+        chalk.magenta(
+            `⚡ Tiempo: ${Date.now() - start}ms`
+        ) +
+
+        '\n' +
+
+        chalk.cyan.bold(
+            '━━━━━━━━━━━━━━━━━━━━━━'
+        )
+    );
+
+
+    if (!ffmpeg) {
+
+        conn.logger.warn(
+            'Instala FFmpeg para enviar videos.'
+        );
+    }
+
+
+    if (
+        ffmpeg &&
+        !ffmpegWebp
+    ) {
+
+        conn.logger.warn(
+            'FFmpeg no tiene soporte WebP.'
+        );
+    }
+
+
+    if (!imageMagick) {
+
+        conn.logger.warn(
+            'Instala ImageMagick o GraphicsMagick para stickers.'
+        );
+    }
 }
 
-_quickTest().then(() => console.log('✅ Prueba rápida realizada!')).catch(console.error);
+
+// ============================================================
+// START
+// ============================================================
+
+_quickTest()
+    .then(
+        () =>
+            console.log(
+                '✅ Prueba rápida realizada!'
+            )
+    )
+    .catch(
+        console.error
+    );
