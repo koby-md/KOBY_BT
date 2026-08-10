@@ -20,49 +20,6 @@ const delay = ms =>
         setTimeout(resolve, ms)
     )
 
-
-/*
- * =========================================
- * ALWAYS ONLINE
- * =========================================
- *
- * يبقى البوت في حالة Available.
- *
- * لا ننشئ أكثر من interval واحد.
- */
-
-if (!global.__alwaysOnlineInterval) {
-
-    global.__alwaysOnlineInterval =
-        setInterval(
-            async () => {
-
-                try {
-
-                    const conn =
-                        global.conn
-
-                    if (!conn)
-                        return
-
-                    await conn.sendPresenceUpdate(
-                        'available'
-                    )
-
-                } catch {}
-
-            },
-            20000
-        )
-}
-
-
-/*
- * =========================================
- * HANDLER
- * =========================================
- */
-
 export async function handler(chatUpdate) {
 
     let settings = {}
@@ -75,70 +32,6 @@ export async function handler(chatUpdate) {
 
     if (!chatUpdate.messages?.length)
         return
-
-
-    /*
-     * =====================================
-     * ALWAYS ONLINE
-     * =====================================
-     *
-     * نرسل available أيضاً عند وصول
-     * أي تحديث، حتى لا ننتظر الـinterval.
-     */
-
-    try {
-
-        await this.sendPresenceUpdate(
-            'available'
-        )
-
-    } catch {}
-
-
-    /*
-     * =====================================
-     * READ ALL INCOMING MESSAGES
-     * BLUE TICKS
-     * =====================================
-     *
-     * نقرأ جميع الرسائل الواردة في التحديث.
-     *
-     * لا نضع opts.autoread هنا.
-     *
-     * fromMe لا نحتاج إلى قراءتها.
-     */
-
-    try {
-
-        const incomingKeys =
-            chatUpdate.messages
-                .filter(
-                    msg =>
-                        msg?.key &&
-                        !msg.key.fromMe
-                )
-                .map(
-                    msg => msg.key
-                )
-
-        if (
-            incomingKeys.length
-        ) {
-
-            await this.readMessages(
-                incomingKeys
-            )
-
-        }
-
-    } catch {}
-
-
-    /*
-     * =====================================
-     * LAST MESSAGE
-     * =====================================
-     */
 
     let rawMessage =
         chatUpdate.messages[
@@ -858,6 +751,9 @@ export async function handler(chatUpdate) {
              * =================================
              * PREFIX
              * =================================
+             *
+             * نفس الفكرة ديال handler الآخر:
+             * prefix يتفحص بشكل صحيح.
              */
 
             const str2Regex =
@@ -1164,6 +1060,13 @@ export async function handler(chatUpdate) {
              * =================================
              * CHAT GUARDS
              * =================================
+             *
+             * هنا الفرق:
+             *
+             * ما كاين حتى guard عام للخاص.
+             *
+             * Group فقط إذا plugin.group
+             * Private فقط إذا plugin.private
              */
 
             if (
@@ -1643,6 +1546,9 @@ export async function handler(chatUpdate) {
          * =====================================
          * GROUP STATS
          * =====================================
+         *
+         * statsMsg ديال Group فقط،
+         * ولكن handler نفسه كيخدم فالخاص.
          */
 
         try {
@@ -1772,7 +1678,6 @@ export async function handler(chatUpdate) {
                     m,
                     this
                 )
-
             }
 
         } catch (e) {
@@ -1784,29 +1689,32 @@ export async function handler(chatUpdate) {
             )
         }
 
-
         /*
          * =====================================
-         * ALWAYS READ CURRENT MESSAGE
-         * BLUE TICKS
+         * AUTOREAD
          * =====================================
-         *
-         * هذا احتياط إضافي للرسالة الحالية.
-         *
-         * لا نعتمد على opts.autoread.
          */
 
         try {
 
+            const opts =
+                global.opts || {}
+
             if (
-                m?.key &&
-                !m.key.fromMe
+                opts.autoread &&
+                m?.chat
             ) {
 
-                await this.readMessages([
-                    m.key
-                ])
-
+                await this.chatRead(
+                    m.chat,
+                    m.isGroup
+                        ? m.sender
+                        : undefined,
+                    m.id ||
+                    m.key?.id
+                ).catch(
+                    () => {}
+                )
             }
 
         } catch {}
